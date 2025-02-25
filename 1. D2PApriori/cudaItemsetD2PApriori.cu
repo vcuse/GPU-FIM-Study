@@ -3,7 +3,6 @@
 #include <pthread.h>
 #include <bits/stdc++.h>
 #include <cuda_runtime.h>
-#include <cuco/dynamic_map.cuh>
 #include <unordered_map>
 #include <iostream>
 #include <string.h>
@@ -47,7 +46,7 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
     int number = 0;
     int items[32];
     // Initialize the shared memory (done by thread 0 in each block)
-    if (tid == 0) {
+    if (tid <= 9) {
         printf("are are in tid %d\n", tid);
         //Extract items from the input line
         for (char* current = line; *current != '\n' && *current != '\0'; current++) {
@@ -58,7 +57,7 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
                 
                 items[itemCount] = number;
                 itemCount++;
-                number = 0;
+                number = 0; 
                 inNumber = false;
                 
             }
@@ -69,9 +68,10 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
              items[itemCount++] = number;
         }
         for(int i = 0; i < itemCount; i++){
-            printf("%d ", items[i]);
+            printf("%d", items[i]);
+            
         }
-        printf("\n");
+        
         
     }
     __syncthreads();
@@ -92,7 +92,7 @@ int KNN() {
     clock_t setupTimeStart = clock();
     //int lineCountInDataset = 1692081;
     int lineCountInDataset = 55012;
-    const char* inDataFilePath = "sortedDataBase.txt";
+    const char* inDataFilePath = "../sortedDataBase.txt";
 
     FILE* file = fopen(inDataFilePath, "r");
 
