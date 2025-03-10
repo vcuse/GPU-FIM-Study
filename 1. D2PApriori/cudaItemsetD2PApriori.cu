@@ -237,13 +237,15 @@ int KNN() {
 
     printf("we escaped the for loop");
     for(int i = 0; i < 1000; i++){
-        if( i = 999){
+        if( i == 999){
             printf("\n Item %d: ", i);
             for(int j = 0; j < 3125; j++){
                 
-                    int position = j*32;
-                    printf("%d, tid %d ", itemsBitmap[i * 3125 + j], position);
-                
+                    int position = 100000 - (j*32);
+                    int locationtracker = i * 3125 + j;
+                    if(itemsBitmap[i * 3125 + j] != 0){
+                        printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| " , itemsBitmap[locationtracker], position, locationtracker);
+                    }
             }
         }
     }
