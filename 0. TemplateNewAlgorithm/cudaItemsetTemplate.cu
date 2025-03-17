@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string.h>
 #include <time.h>
+#include "../include/commonmethods.h"
 
 #define MAX_NODES 6000  // Maximum nodes in the FP-Tree
 #define EMPTY -1
@@ -21,10 +22,6 @@ typedef struct {
     int firstChild; 
 } Node; 
 
-typedef struct {
-    int id;
-    int* bitmap;
-} ItemBitmap;
 
 __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets, int totalRecords, int blocksPerGrid) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;

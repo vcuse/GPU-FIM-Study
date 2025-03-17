@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string.h>
 #include <time.h>
+#include "../include/commonmethods.h"
 
 #define MAX_NODES 6000 // Maximum nodes in the FP-Tree
 #define EMPTY -1
@@ -22,11 +23,7 @@ typedef struct
     int firstChild;
 } Node;
 
-typedef struct
-{
-    int item;
-    int *bitmap;
-} ItemBitmap;
+
 
 // Calculates the distance between two instances
 __device__ float generateItemSet(float *instance_A, float *instance_B, int num_attributes)
@@ -95,9 +92,7 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
     }
 }
 
-int generateBitmapCPU(char *inData)
-{
-}
+
 
 // Compute support by intersecting the bitsets of all items in 'set'
 int computeSupport(ItemBitmap* set, int rowSize) {
@@ -213,6 +208,8 @@ int KNN()
     // for(int i = 0; i < 181682; i++){
     //     firstBitmap[i].bitmap = (int*)calloc(1718, sizeof(int));
     // }
+
+    //int* itemBitmap2 = generateBitmapCPU(h_buffer, h_offsets);
     int countOfItems = 0;
     // int items[55012];
     // printf("before for loop\n");
@@ -337,19 +334,27 @@ int KNN()
 
     int indexInArray = 0;
     ItemBitmap* cpuFreqBitmap = (ItemBitmap*)calloc(countOfFreqItem, sizeof(ItemBitmap));
+    for(int i = 0; i < countOfFreqItem; i++){
+        cpuFreqBitmap[i].bitmap = (int*)malloc(rowSize * sizeof(int));
+    }
+
     for (int i = 0; i < 1000; i++)
     {
         if (itemAndCounts[i] >= 3)
         {   
             cpuFreqBitmap[indexInArray].item  = i;
             //cpuFreqBitmap[indexInArray] -> item = i;
-            memcpy(cpuFreqBitmap[indexInArray].bitmap, &itemsBitmap[i * 3125], rowSize * sizeof(int));
+
+            memcpy(cpuFreqBitmap[indexInArray].bitmap, &itemsBitmap[i * rowSize], rowSize * sizeof(int));
             indexInArray++;
             
-            printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
+            //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
         }
     }
 
+    for(int i = 0; i < indexInArray; i++){
+        printf("Our frequent item is %d ", cpuFreqBitmap[i].item);
+    }
 
     int k = 1;
     while(countOfFreqItem > 0){
@@ -358,7 +363,7 @@ int KNN()
 
     }
 
-    printf("total number of items is %d\n", countOfItems);
+    //printf("total number of items is %d\n", countOfItems);
     // Allocate memory on the GPU
     char *d_text;
     int *d_offsets;
