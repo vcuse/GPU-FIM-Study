@@ -114,7 +114,7 @@ int* generateBitmapCPU(char* h_buffer, int* h_offsets){
     //going through the database line by line
     for(int i = 0; i < 100000; i++){
         //printf("line %d\n", i);
-        int locationOfTransaction = (rowSize) - (i/32);
+        int locationOfTransaction = i / 32;
         //code for where to flip the bit 
         //  = (i / 32) + ( i % 32)  
         number = 0;
