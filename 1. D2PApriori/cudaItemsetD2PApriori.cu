@@ -96,6 +96,16 @@ int generateBitmapCPU(char* inData){
     
 }
 
+/* 
+removeLowFrequencyItems is used to remove the items in the bitmap that have low frequency 
+it will return a new bitmap database containing only items which were determined to have support
+greater than the minimum threshold
+*/
+int* removeLowFrequencyItemsCPU(int* inBitMap, int rowLength, int minItemCount){
+
+
+}
+
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
 int KNN() {   
     printf("we started\n");
@@ -240,11 +250,17 @@ int KNN() {
         if( i == 999){
             printf("\n Item %d: ", i);
             for(int j = 0; j < 3125; j++){
-                
+                    
+                int temp = itemsBitmap[i * 3125 + j];
+
+
                     int position = 100000 - (j*32);
                     int locationtracker = i * 3125 + j;
                     if(itemsBitmap[i * 3125 + j] != 0){
-                        printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| " , itemsBitmap[locationtracker], position, locationtracker);
+                        int temp = itemsBitmap[i * 3125 + j] & -itemsBitmap[i * 3125 + j];
+                        int index = __builtin_ctz(temp); // Get index of LSB (0-based)
+                         printf("Bit at index: %d\n", index);
+                        printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| " , itemsBitmap[locationtracker], position + index + 1, locationtracker);
                     }
             }
         }
@@ -264,8 +280,8 @@ int KNN() {
     int blocksPerGrid = ((lineCountInDataset + threadsPerBlock) - 1) /  threadsPerBlock; //how do we know how many blocks we need to use?
     //printf("BlocksPerGrid = %d\n", blocksPerGrid);
     printf("number of threads is roughly %d\n", threadsPerBlock*blocksPerGrid);
-
-
+    int countBitTest = 6;
+    printf("result of buildin_popcount = %d\n",__builtin_popcount(countBitTest) );
     
 
     int minItemCount = 3; //setting the minimum # of items to be considered an itemset
