@@ -126,10 +126,10 @@ int *removeLowFrequencyItemsCPU(int *inBitMap, int rowLength, int minItemCount)
 {
 }
 
-int *generateCandidates(int *inBitMap, int rowLength, int minItemCount){
+int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount){
     int k = 0;
 
-    if(sizeof(inBitMap) == 0){
+    if(sizeof(inBitmap) == 0){
         
     }
 }
@@ -137,6 +137,7 @@ int *generateCandidates(int *inBitMap, int rowLength, int minItemCount){
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
 int KNN()
 {
+     int minItemCount = 3; // setting the minimum # of items to be considered an itemset
     printf("we started\n");
     clock_t cpu_start_withSetup = clock();
     int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
@@ -236,12 +237,11 @@ int KNN()
             else if (inNumber)
             {
                 int locationOfInsertion = locationOfTransaction + (number * rowSize);
-                if (number == 999)
-                {
+                
                     int locationOfLine = i + 1;
-                    printf("We found item 999 at line %d\n", locationOfLine);
-                    printf("the location of insertion will be %d\b\n", locationOfInsertion);
-                }
+                    //printf("We found item 999 at line %d\n", locationOfLine);
+                    //printf("the location of insertion will be %d\b\n", locationOfInsertion);
+                
 
                 // printf("Are we gonna segfault? + locaiton of insertion %d and number is %d\n", locationOfInsertion, number);
                 itemsBitmap[locationOfInsertion] |= (1 << (i % 32));
@@ -262,7 +262,7 @@ int KNN()
         // printf("not segfaulted\n");
         if (number == 999)
         {
-            printf("We found item 999 at %d\n", i);
+            //printf("We found item 999 at %d\n", i);
         }
         // firstBitmap[countInBitmap].id =  number;
         // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
@@ -300,8 +300,8 @@ int KNN()
                 {
                     int temp = itemsBitmap[i * 3125 + j] & -itemsBitmap[i * 3125 + j];
                     int index = __builtin_ctz(temp); // Get index of LSB (0-based)
-                    printf("Bit at index: %d\n", index);
-                    printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
+                    //printf("Bit at index: %d\n", index);
+                    //printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
                 }
             }
         }
@@ -336,15 +336,16 @@ int KNN()
     ItemBitmap* cpuFreqBitmap = (ItemBitmap*)calloc(countOfFreqItem, sizeof(ItemBitmap));
     for(int i = 0; i < countOfFreqItem; i++){
         cpuFreqBitmap[i].bitmap = (int*)malloc(rowSize * sizeof(int));
+        cpuFreqBitmap[i].item = (int*)malloc(sizeof(int));
     }
 
     for (int i = 0; i < 1000; i++)
     {
         if (itemAndCounts[i] >= 3)
         {   
-            cpuFreqBitmap[indexInArray].item  = i;
+            memcpy(cpuFreqBitmap[indexInArray].item, &i, sizeof(int));
             //cpuFreqBitmap[indexInArray] -> item = i;
-
+            
             memcpy(cpuFreqBitmap[indexInArray].bitmap, &itemsBitmap[i * rowSize], rowSize * sizeof(int));
             indexInArray++;
             
@@ -352,15 +353,48 @@ int KNN()
         }
     }
 
+    // for(int i = 0; i < indexInArray; i++){
+    //     printf("Our frequent item is %d \n", cpuFreqBitmap[i].item[0]);
+    //     for(int j = 0; j < 1000; j++){
+    //         int value =  cpuFreqBitmap[i].bitmap[j];
+    //         if(value != 0){
+    //             printf(" index start:%d : %d ", j * 32 + 1, value);
+    //         }
+    //     }
+    //     printf("\n");
+    // }
+
+    
+    int k = 1;
+    
+    //generating 2 itemsets
+    //calculating worst case max size needed for n=2 itemsets
+    int numPairs = indexInArray * (indexInArray -1)/2;
+    printf("numpairs is %d\n", numPairs);
+    ItemBitmap* cpu2Itemsets = (ItemBitmap*)calloc(numPairs, sizeof(ItemBitmap));
+
+    for(int i = 0; i < numPairs; i++){
+        cpu2Itemsets[i].item = (int *)malloc(2 * sizeof(int));
+        cpu2Itemsets[i].bitmap = (int *)malloc(1 * rowSize * sizeof(int));
+    }
+    int countIndexInPairs = 0;
+
+    
     for(int i = 0; i < indexInArray; i++){
-        printf("Our frequent item is %d ", cpuFreqBitmap[i].item);
+         
+        for(int j = i + 1; j < indexInArray; j++){
+            cpu2Itemsets[countIndexInPairs].item[0] = cpuFreqBitmap[i].item[0];
+            cpu2Itemsets[countIndexInPairs].item[1] = cpuFreqBitmap[j].item[0];
+            
+            cpu2Itemsets[countIndexInPairs].bitmap[k] = cpuFreqBitmap[i].bitmap[k] ^ cpuFreqBitmap[j].bitmap[k];
+            countIndexInPairs++;
+            
+        }
+
     }
 
-    int k = 1;
-    while(countOfFreqItem > 0){
-        countOfFreqItem = 0;
-
-
+    for(int i = 0; i < numPairs; i++){
+        printf("pair is %d and %d\n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
     }
 
     //printf("total number of items is %d\n", countOfItems);
@@ -380,7 +414,7 @@ int KNN()
     int countBitTest = 6;
     printf("result of buildin_popcount = %d\n", __builtin_popcount(countBitTest));
 
-    int minItemCount = 3; // setting the minimum # of items to be considered an itemset
+   
 
     // here I would want to generate all itemsets
 
