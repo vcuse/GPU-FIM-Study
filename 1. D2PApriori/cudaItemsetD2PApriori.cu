@@ -314,7 +314,7 @@ int KNN()
         if (itemAndCounts[i] >= 3)
         {
             countOfFreqItem++;
-            printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
+            //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
         }
     }
 
@@ -370,7 +370,7 @@ int KNN()
     //generating 2 itemsets
     //calculating worst case max size needed for n=2 itemsets
     int numPairs = indexInArray * (indexInArray -1)/2;
-    printf("numpairs is %d\n", numPairs);
+    //printf("numpairs is %d\n", numPairs);
     ItemBitmap* cpu2Itemsets = (ItemBitmap*)calloc(numPairs, sizeof(ItemBitmap));
 
     for(int i = 0; i < numPairs; i++){
@@ -380,6 +380,7 @@ int KNN()
     int countIndexInPairs = 0;
 
     
+    /*generating the c=2 itemsets (I'm generating all of them)*/
     for(int i = 0; i < indexInArray; i++){
          
         for(int j = i + 1; j < indexInArray; j++){
@@ -393,9 +394,19 @@ int KNN()
 
     }
 
+    int countOf2Itemsets = 0;
     for(int i = 0; i < numPairs; i++){
-        printf("pair is %d and %d\n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
+        int countOfBits = 0;
+        //printf("pair is %d and %d\n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
+        for(int j = 0; j < rowSize; j++){
+            countOfBits += __builtin_popcount(cpu2Itemsets[i].bitmap[j]);
+        }
+        if(countOfBits >= minItemCount){
+            countOf2Itemsets++;
+        }
     }
+
+    printf("Count of frequent 2 itemsets is %d\n", countOf2Itemsets);
 
     //printf("total number of items is %d\n", countOfItems);
     // Allocate memory on the GPU
