@@ -365,7 +365,7 @@ int KNN()
     // }
 
     
-    int k = 1;
+    
     
     //generating 2 itemsets
     //calculating worst case max size needed for n=2 itemsets
@@ -380,14 +380,15 @@ int KNN()
     int countIndexInPairs = 0;
 
     
-    /*generating the c=2 itemsets (I'm generating all of them)*/
+    /*generating the 2 length itemsets (I'm generating all of them)*/
     for(int i = 0; i < indexInArray; i++){
          
         for(int j = i + 1; j < indexInArray; j++){
             cpu2Itemsets[countIndexInPairs].item[0] = cpuFreqBitmap[i].item[0];
             cpu2Itemsets[countIndexInPairs].item[1] = cpuFreqBitmap[j].item[0];
-            
-            cpu2Itemsets[countIndexInPairs].bitmap[k] = cpuFreqBitmap[i].bitmap[k] ^ cpuFreqBitmap[j].bitmap[k];
+            for(int k = 0; k < rowSize; k++){
+                cpu2Itemsets[countIndexInPairs].bitmap[k] = cpuFreqBitmap[i].bitmap[k] & cpuFreqBitmap[j].bitmap[k];
+            }
             countIndexInPairs++;
             
         }
@@ -403,10 +404,27 @@ int KNN()
         }
         if(countOfBits >= minItemCount){
             countOf2Itemsets++;
+            printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
         }
     }
 
     printf("Count of frequent 2 itemsets is %d\n", countOf2Itemsets);
+    int sizeOfQueueToGpu = 2 * countOf2Itemsets;
+    ItemBitmap* queueToGpu = (ItemBitmap*)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
+    for(int i = 0; i < sizeOfQueueToGpu; i++){
+        queueToGpu[i].item = (int *)malloc(sizeof(int));
+        queueToGpu[i].bitmap = (int *)malloc(rowSize * sizeof(int));
+    }
+    printf("past malloc gpu queue\n");
+    /*This is very inefficient (the array isn't flat), will need to be improved*/
+    for(int i = 0; i < 2; i++){
+        for(int j = 0; j < countOf2Itemsets; j++){
+                int item = cpu2Itemsets[j].item[i];
+                printf("item is %d", item);
+                //here we are getting the bitmap from the orginal 1 frequent items array
+                queueToGpu[i*countOf2Itemsets + j] = cpuFreqBitmap[item];
+        }
+    }
 
     //printf("total number of items is %d\n", countOfItems);
     // Allocate memory on the GPU
