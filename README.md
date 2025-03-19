@@ -9,3 +9,5 @@ This is a study focused on benchmarking and testing popular Frequent Itemset alg
 Each algorithm is run on the same exact datasets. For now the datasets we are including are 
 - T10I4D100K
 
+# How does this study work?
+The goal is to recode all of the algorithms from a list of around 20 algorithms. I have tried to modularize the code as much as possible, providing opportunities for those working on this project to re-use code that is already written. Once all of the algorithms are completed, we will run them on standardized datasets. 
