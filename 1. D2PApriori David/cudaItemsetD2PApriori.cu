@@ -93,6 +93,12 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
 }
 
 
+__global__ void processItemsetOnGPU(ItemBitmap *items){
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
+        printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
+    
+}
 
 // Compute support by intersecting the bitsets of all items in 'set'
 int computeSupport(ItemBitmap* set, int rowSize) {
@@ -404,7 +410,7 @@ int KNN()
         }
         if(countOfBits >= minItemCount){
             countOf2Itemsets++;
-            printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
+            //printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
         }
     }
 
@@ -415,29 +421,51 @@ int KNN()
         queueToGpu[i].item = (int *)malloc(sizeof(int));
         queueToGpu[i].bitmap = (int *)malloc(rowSize * sizeof(int));
     }
+
+    
     printf("past malloc gpu queue\n");
     /*This is very inefficient (the array isn't flat), will need to be improved*/
     for(int i = 0; i < 2; i++){
         for(int j = 0; j < countOf2Itemsets; j++){
+                //printf("before item");
                 int item = cpu2Itemsets[j].item[i];
-                printf("item is %d", item);
+                //printf("item is %d", item);
                 //here we are getting the bitmap from the orginal 1 frequent items array
-                queueToGpu[i*countOf2Itemsets + j] = cpuFreqBitmap[item];
+                queueToGpu[i*countOf2Itemsets + j].item[0] = item;
+                queueToGpu[i*countOf2Itemsets + j].bitmap = &itemsBitmap[item];
         }
     }
+    printf("we just filled the gpu queue");
+    /* We are now ready to send this to the gpu*/
+    ItemBitmap *d_2Itemsets;
+    cudaMalloc(&(d_2Itemsets), sizeOfQueueToGpu * sizeof(ItemBitmap));
+    for(int i = 0; i < sizeOfQueueToGpu; i++){
+    //     cudaMemcpy(&(d_2Itemsets[i] ->item), ,1 * sizeof(int *), cudaMemcpyHostToDevice);
+    //     cudaMemcpy(&(d_2Itemsets[i] ->bitmap), rowSize * sizeof(int *), cudaMemcpyHostToDevice);
+    //     // cudaMalloc(&d_2Itemsets[i].item, sizeof(int));
+        //cudaMalloc((void**)&((d_2Itemsets)[i].bitmap), rowSize * sizeof(int));
+    }
+    printf("we just past cudaMalloc\n");
+    //cudaMemcpy(d_2Itemsets, queueToGpu, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
+    printf("we got past firstmemcpy \n");
+    ItemBitmap *h_2Itemsets = (ItemBitmap *)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
+
+    for (int i = 0; i < sizeOfQueueToGpu; i++) {
+        // Allocate memory for struct members on the GPU
+        cudaMalloc(&(h_2Itemsets[i].item), sizeof(int)); 
+        cudaMalloc(&(h_2Itemsets[i].bitmap), rowSize * sizeof(int));
+
+        // Copy actual bitmap data from host to device
+        cudaMemcpy(h_2Itemsets[i].item, queueToGpu[i].item, sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
+    }
+
+    cudaMemcpy(d_2Itemsets, h_2Itemsets, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
 
     //printf("total number of items is %d\n", countOfItems);
     // Allocate memory on the GPU
-    char *d_text;
-    int *d_offsets;
-    cudaMalloc(&d_text, file_size);
-    cudaMalloc(&d_offsets, lineCountInDataset * sizeof(int));
-
-    // Copy the file contents to the GPU
-    cudaMemcpy(d_text, h_buffer, file_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_offsets, h_offsets, lineCountInDataset * sizeof(int), cudaMemcpyHostToDevice);
     int threadsPerBlock = 32;
-    int blocksPerGrid = ((lineCountInDataset + threadsPerBlock) - 1) / threadsPerBlock; // how do we know how many blocks we need to use?
+    int blocksPerGrid = 1; // how do we know how many blocks we need to use?
     // printf("BlocksPerGrid = %d\n", blocksPerGrid);
     printf("number of threads is roughly %d\n", threadsPerBlock * blocksPerGrid);
     int countBitTest = 6;
@@ -456,6 +484,7 @@ int KNN()
 
     cudaEventRecord(startEvent);
     // processItemSets<<<blocksPerGrid, threadsPerBlock>>>(d_text, minItemCount, d_offsets, lineCountInDataset, blocksPerGrid);
+    processItemsetOnGPU<<<blocksPerGrid, threadsPerBlock>>>(d_2Itemsets);
     cudaDeviceSynchronize();
     cudaEventRecord(stopEvent);
     cudaEventSynchronize(stopEvent);
