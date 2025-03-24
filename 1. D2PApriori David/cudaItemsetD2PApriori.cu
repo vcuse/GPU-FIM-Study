@@ -96,7 +96,7 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
 __global__ void processItemsetOnGPU(ItemBitmap *items){
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
-        printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
+        //printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
     
 }
 
@@ -146,6 +146,7 @@ int KNN()
      int minItemCount = 3; // setting the minimum # of items to be considered an itemset
     printf("we started\n");
     clock_t cpu_start_withSetup = clock();
+    //a 1-d array (flat) that will store all of the 1sized itemsets
     int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
     clock_t setupTimeStart = clock();
     // int lineCountInDataset = 1692081;
@@ -243,11 +244,11 @@ int KNN()
             else if (inNumber)
             {
                 int locationOfInsertion = locationOfTransaction + (number * rowSize);
-                
+                if(number == 999){
                     int locationOfLine = i + 1;
-                    //printf("We found item 999 at line %d\n", locationOfLine);
-                    //printf("the location of insertion will be %d\b\n", locationOfInsertion);
-                
+                    printf("We found item 999 at line %d\n", locationOfLine);
+                    printf("the location of insertion will be %d\b\n", locationOfInsertion);
+                }
 
                 // printf("Are we gonna segfault? + locaiton of insertion %d and number is %d\n", locationOfInsertion, number);
                 itemsBitmap[locationOfInsertion] |= (1 << (i % 32));
@@ -268,7 +269,7 @@ int KNN()
         // printf("not segfaulted\n");
         if (number == 999)
         {
-            //printf("We found item 999 at %d\n", i);
+            printf("We found item 999 at %d\n", i);
         }
         // firstBitmap[countInBitmap].id =  number;
         // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
@@ -307,7 +308,7 @@ int KNN()
                     int temp = itemsBitmap[i * 3125 + j] & -itemsBitmap[i * 3125 + j];
                     int index = __builtin_ctz(temp); // Get index of LSB (0-based)
                     //printf("Bit at index: %d\n", index);
-                    //printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
+                    printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
                 }
             }
         }
@@ -328,15 +329,6 @@ int KNN()
     int* items = (int *)calloc(countOfFreqItem * 3125, sizeof(int));
     
     
-    for (int i = 0; i < 1000; i++)
-    {
-        if (itemAndCounts[i] >= 3)
-        {
-            
-            countOfFreqItem++;
-            //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
-        }
-    }
 
     int indexInArray = 0;
     ItemBitmap* cpuFreqBitmap = (ItemBitmap*)calloc(countOfFreqItem, sizeof(ItemBitmap));
@@ -462,11 +454,10 @@ int KNN()
 
     cudaMemcpy(d_2Itemsets, h_2Itemsets, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
 
-    //printf("total number of items is %d\n", countOfItems);
-    // Allocate memory on the GPU
+    /*  */
     int threadsPerBlock = 32;
-    int blocksPerGrid = 1; // how do we know how many blocks we need to use?
-    // printf("BlocksPerGrid = %d\n", blocksPerGrid);
+    int blocksPerGrid = (sizeOfQueueToGpu * rowSize + 32) / 32; // how do we know how many blocks we need to use?
+    printf("BlocksPerGrid = %d\n", blocksPerGrid);
     printf("number of threads is roughly %d\n", threadsPerBlock * blocksPerGrid);
     int countBitTest = 6;
     printf("result of buildin_popcount = %d\n", __builtin_popcount(countBitTest));
