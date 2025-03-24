@@ -96,6 +96,10 @@ __global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets,
 __global__ void processItemsetOnGPU(ItemBitmap *items){
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
+    if(tid < 1){ 
+        printf("I am tid %d and my items are %d \n", tid, items[tid].item[0]);
+        printf("I am tid %d and my items are %d \n", tid, items[4000].item[0]);
+    }   
         //printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
     
 }
@@ -143,7 +147,7 @@ int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount){
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
 int KNN()
 {
-     int minItemCount = 3; // setting the minimum # of items to be considered an itemset
+    int minItemCount = 3; // setting the minimum # of items to be considered an itemset
     printf("we started\n");
     clock_t cpu_start_withSetup = clock();
     //a 1-d array (flat) that will store all of the 1sized itemsets
@@ -318,7 +322,7 @@ int KNN()
     int countOfFreqItem = 0;
     for (int i = 0; i < 1000; i++)
     {
-        if (itemAndCounts[i] >= 3)
+        if (itemAndCounts[i] >= minItemCount)
         {
             countOfFreqItem++;
             //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
@@ -339,7 +343,7 @@ int KNN()
 
     for (int i = 0; i < 1000; i++)
     {
-        if (itemAndCounts[i] >= 3)
+        if (itemAndCounts[i] >= minItemCount)
         {   
             memcpy(cpuFreqBitmap[indexInArray].item, &i, sizeof(int));
             //cpuFreqBitmap[indexInArray] -> item = i;
@@ -419,44 +423,51 @@ int KNN()
     /*This is very inefficient (the array isn't flat), will need to be improved*/
     for(int i = 0; i < 2; i++){
         for(int j = 0; j < countOf2Itemsets; j++){
-                //printf("before item");
-                int item = cpu2Itemsets[j].item[i];
-                //printf("item is %d", item);
-                //here we are getting the bitmap from the orginal 1 frequent items array
-                queueToGpu[i*countOf2Itemsets + j].item[0] = item;
-                queueToGpu[i*countOf2Itemsets + j].bitmap = &itemsBitmap[item];
+            //printf("before item");
+            int item = cpu2Itemsets[j].item[i];
+            //printf("item is %d", item);
+            //here we are getting the bitmap from the orginal 1 frequent items array
+            queueToGpu[i*countOf2Itemsets + j].item[0] = item;
+            // if(j < 4000 && i < 1){
+            //     printf("item was %d\n", item);
+            //     printf("queue of gpu %d\n", queueToGpu[i*countOf2Itemsets + j].item[0]);
+            // }
+            queueToGpu[i*countOf2Itemsets + j].bitmap = &itemsBitmap[item];
         }
     }
     printf("we just filled the gpu queue");
     /* We are now ready to send this to the gpu*/
     ItemBitmap *d_2Itemsets;
     cudaMalloc(&(d_2Itemsets), sizeOfQueueToGpu * sizeof(ItemBitmap));
-    for(int i = 0; i < sizeOfQueueToGpu; i++){
-    //     cudaMemcpy(&(d_2Itemsets[i] ->item), ,1 * sizeof(int *), cudaMemcpyHostToDevice);
-    //     cudaMemcpy(&(d_2Itemsets[i] ->bitmap), rowSize * sizeof(int *), cudaMemcpyHostToDevice);
-    //     // cudaMalloc(&d_2Itemsets[i].item, sizeof(int));
-        //cudaMalloc((void**)&((d_2Itemsets)[i].bitmap), rowSize * sizeof(int));
-    }
+    // for(int i = 0; i < sizeOfQueueToGpu; i++){
+    // //     cudaMemcpy(&(d_2Itemsets[i] ->item), ,1 * sizeof(int *), cudaMemcpyHostToDevice);
+    // //     cudaMemcpy(&(d_2Itemsets[i] ->bitmap), rowSize * sizeof(int *), cudaMemcpyHostToDevice);
+    // //     // cudaMalloc(&d_2Itemsets[i].item, sizeof(int));
+    //     //cudaMalloc((void**)&((d_2Itemsets)[i].bitmap), rowSize * sizeof(int));
+    // }
     printf("we just past cudaMalloc\n");
     //cudaMemcpy(d_2Itemsets, queueToGpu, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
     printf("we got past firstmemcpy \n");
     ItemBitmap *h_2Itemsets = (ItemBitmap *)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
 
-    for (int i = 0; i < sizeOfQueueToGpu; i++) {
+    for (int i = 0; i < 2 * countOf2Itemsets; i++) {
         // Allocate memory for struct members on the GPU
         cudaMalloc(&(h_2Itemsets[i].item), sizeof(int)); 
         cudaMalloc(&(h_2Itemsets[i].bitmap), rowSize * sizeof(int));
 
         // Copy actual bitmap data from host to device
         cudaMemcpy(h_2Itemsets[i].item, queueToGpu[i].item, sizeof(int), cudaMemcpyHostToDevice);
+        if(i < 1000){
+            printf("we copied an item %d and i was %d\n", queueToGpu[i].item[0], i);
+        }
         cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
     }
-
+    
     cudaMemcpy(d_2Itemsets, h_2Itemsets, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
 
-    /*  */
-    int threadsPerBlock = 32;
-    int blocksPerGrid = (sizeOfQueueToGpu * rowSize + 32) / 32; // how do we know how many blocks we need to use?
+    /* setting up our grid to determine how many threads we will need */
+    int threadsPerBlock = 1024;
+    int blocksPerGrid = ((sizeOfQueueToGpu * rowSize + threadsPerBlock) / threadsPerBlock ) / 2; // how do we know how many blocks we need to use?
     printf("BlocksPerGrid = %d\n", blocksPerGrid);
     printf("number of threads is roughly %d\n", threadsPerBlock * blocksPerGrid);
     int countBitTest = 6;
