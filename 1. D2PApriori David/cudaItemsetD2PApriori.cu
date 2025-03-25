@@ -25,107 +25,64 @@ typedef struct
 
 
 
-// Calculates the distance between two instances
-__device__ float generateItemSet(float *instance_A, float *instance_B, int num_attributes)
-{
-    float sum = 0;
-
-    for (int i = 0; i < num_attributes - 1; i++)
-    {
-        float diff = instance_A[i] - instance_B[i];
-        // printf("instance a and b were %.3f %.3f\n", instance_A[i] ,instance_B[i]);
-        sum += diff * diff;
-    }
-    // printf("sum was %.3f\n,", sum);
-    return sqrt(sum);
-}
-
-__global__ void processItemSets(char *inData, int minimumSetNum, int *d_Offsets, int totalRecords, int blocksPerGrid)
-{
+/* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
+__global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // Shared memory is treated as a single contiguous block
-    extern __shared__ int sharedMemory[];
-
-    char *line = inData + d_Offsets[tid];
-    bool inNumber = false;
-    int itemCount = 0;
-    int number = 0;
-    int items[32];
-
-    // Initialize the shared memory (done by thread 0 in each block)
-    if (tid <= 10000)
-    {
-        printf("we are in tid %d\n", tid);
-        // Extract items from the input line
-        for (char *current = line; *current != '\n' && *current != '\0'; current++)
-        {
-            if (*current >= '0' && *current <= '9')
-            {
-                number = number * 10 + (*current - '0');
-                inNumber = true;
-            }
-            else if (inNumber)
-            {
-
-                items[itemCount] = number;
-                itemCount++;
-                number = 0;
-                inNumber = false;
-            }
-        }
-
-        if (inNumber)
-        {
-            items[itemCount++] = number;
-        }
-        for (int i = 0; i < itemCount; i++)
-        {
-            printf("%d", items[i]);
-        }
+    int sectionOfBitmap = tid % rowSize;
+    //since our Vert database is so long, it will span multiple blocks 
+    bool isInFirstBlock = true;
+    if(sectionOfBitmap > blockDim.x){
+        isInFirstBlock = false;
     }
-    __syncthreads();
-
-    // Parse the input and build the FP-Tree
-    if (tid < totalRecords)
-    {
-    }
-}
-
-
-__global__ void processItemsetOnGPU(ItemBitmap *items){
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    if(tid < 1){ 
-        printf("I am tid %d and my items are %d \n", tid, items[tid].item[0]);
-        printf("I am tid %d and my items are %d \n", tid, items[4000].item[0]);
+    if(tid < 3125){
+        int verticalListIndex = tid / rowSize;
+        int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
+        int item1 = items[verticalListIndex].item[0];
+        int item2 = items[verticalListIndex2].item[0];
+        if(tid % rowSize <= 2){ 
+            printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, items[tid / rowSize].item[0], items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
+            //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
+        }
+
+        int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
+        int resultIndex = sectionOfBitmap * 32;
+        if(result != 0){
+            printf("items 0 and 1 are at are around %d result was %d\n", resultIndex, result);
+        }
+        
     }   
+    __syncthreads();
+    // if(tid < countOf2Itemsets){
+    // int item = items[tid].item[0];
+    //     if (item == 999)
+    //     {
+    //         printf("\n Item %d: ", item);
+    //         for (int j = 0; j < 3125; j++)
+    //         {
+
+    //             int temp = items[tid].bitmap[j];
+                
+    //             int position = 100000 - (j * 32);
+    //             int locationtracker = j;
+    //             if (temp != 0)
+    //             {
+    //                 //int temp = itemsBitmap[ j] & -itemsBitmap[ j];
+    //                 int index =  __ffs(temp);  // Get index of LSB (0-based)
+    //                 //printf("Bit at index: %d\n", index);
+    //                 printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ",temp, position + index + 1, locationtracker);
+    //             }
+    //         }
+    //     }
+    // }
+
+    
+     
+
         //printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
     
 }
 
-// Compute support by intersecting the bitsets of all items in 'set'
-int computeSupport(ItemBitmap* set, int rowSize) {
-    // // Start with the bitset of the first item
-    // static uint32_t temp[rowSize];
-    // memcpy(temp, bitsets[set->items[0]], rowSize * sizeof(uint32_t));
-
-    // // Intersect with the rest
-    // for (int i = 1; i < set->length; i++) {
-    //     int item = set->items[i];
-    //     for(int block = 0; block < rowSize; block++){
-    //         temp[block] &= bitsets[item][block];
-    //     }
-    // }
-
-    // // Count total bits set
-    // int support = 0;
-    // for(int block = 0; block < rowSize; block++){
-    //     support += popcount32(temp[block]);
-    // }
-
-    // return support;
-}
 
 /*
 removeLowFrequencyItems is used to remove the items in the bitmap that have low frequency
@@ -248,10 +205,10 @@ int KNN()
             else if (inNumber)
             {
                 int locationOfInsertion = locationOfTransaction + (number * rowSize);
-                if(number == 999){
+                if(number == 0){
                     int locationOfLine = i + 1;
-                    printf("We found item 999 at line %d\n", locationOfLine);
-                    printf("the location of insertion will be %d\b\n", locationOfInsertion);
+                    //printf("We found item 0 at line %d", locationOfLine);
+                    //printf("the location of insertion will be %d\b\n", locationOfInsertion);
                 }
 
                 // printf("Are we gonna segfault? + locaiton of insertion %d and number is %d\n", locationOfInsertion, number);
@@ -266,25 +223,36 @@ int KNN()
                 number = 0;
                 inNumber = false;
             }
-
+            // if (number == 999)
+            // {
+            //     printf("We found item 999 at %d\n", i);
+            //     int locationOfInsertion = locationOfTransaction + (number * rowSize);
+            //     itemsBitmap[locationOfInsertion] |= (1 << (i % 32));
+            //     countOfItems++;
+            //     countInBitmap++;
+            //     inNumber = false;
+            // }
             // printf("\n");
         }
 
         // printf("not segfaulted\n");
-        if (number == 999)
-        {
-            printf("We found item 999 at %d\n", i);
-        }
+        
         // firstBitmap[countInBitmap].id =  number;
         // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
-        int locationOfInsertion = locationOfTransaction + (number * rowSize);
         // printf("Are we gonna segfault OUT OF INNER? + locaiton of insertion %d\n", locationOfInsertion);
-        itemsBitmap[locationOfInsertion] |= (1 << (i % 32));
-        countInBitmap++;
+        //countInBitmap++;
         // printf("%d\n", number);
-        countOfItems++;
+        //countOfItems++;
     }
 
+    int firstItemCount = 0;
+    for(int i = 0; i < rowSize; i++){
+        if(itemsBitmap[999 * rowSize + i]!= 0){
+            firstItemCount += __builtin_popcount(itemsBitmap[999 * rowSize + i]);
+        }
+    }
+
+    printf("total number of 999s is %d\n", firstItemCount);
     printf("we escaped the for loop");
     int *itemAndCounts = (int *)calloc(1000, sizeof(int));
     for (int i = 0; i < 1000; i++)
@@ -292,27 +260,28 @@ int KNN()
         int sumOfInts = 0;
         for (int j = 0; j < rowSize; j++)
         {
-
             sumOfInts += __builtin_popcount(itemsBitmap[i * 3125 + j]);
         }
         itemAndCounts[i] = sumOfInts;
 
-        if (i == 999)
+        if (i == 0)
         {
             printf("\n Item %d: ", i);
-            for (int j = 0; j < 3125; j++)
+            for (int j = 0; j < rowSize; j++)
             {
 
                 int temp = itemsBitmap[i * 3125 + j];
 
                 int position = 100000 - (j * 32);
                 int locationtracker = i * 3125 + j;
-                if (itemsBitmap[i * 3125 + j] != 0)
+                if (itemsBitmap[i * rowSize + j] != 0)
                 {
-                    int temp = itemsBitmap[i * 3125 + j] & -itemsBitmap[i * 3125 + j];
+                    int temp = itemsBitmap[i * rowSize + j] & -itemsBitmap[i * rowSize + j];
                     int index = __builtin_ctz(temp); // Get index of LSB (0-based)
                     //printf("Bit at index: %d\n", index);
-                    printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
+                    if(locationtracker < 20){
+                        printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
+                    }
                 }
             }
         }
@@ -355,20 +324,7 @@ int KNN()
         }
     }
 
-    // for(int i = 0; i < indexInArray; i++){
-    //     printf("Our frequent item is %d \n", cpuFreqBitmap[i].item[0]);
-    //     for(int j = 0; j < 1000; j++){
-    //         int value =  cpuFreqBitmap[i].bitmap[j];
-    //         if(value != 0){
-    //             printf(" index start:%d : %d ", j * 32 + 1, value);
-    //         }
-    //     }
-    //     printf("\n");
-    // }
 
-    
-    
-    
     //generating 2 itemsets
     //calculating worst case max size needed for n=2 itemsets
     int numPairs = indexInArray * (indexInArray -1)/2;
@@ -403,10 +359,14 @@ int KNN()
         //printf("pair is %d and %d\n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
         for(int j = 0; j < rowSize; j++){
             countOfBits += __builtin_popcount(cpu2Itemsets[i].bitmap[j]);
+            if(cpu2Itemsets[i].item[0] == 0){
+                //printf("count of bits was %d\n", __builtin_popcount(cpu2Itemsets[i].bitmap[j]));
+                //printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
+            }
         }
         if(countOfBits >= minItemCount){
             countOf2Itemsets++;
-            //printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
+            
         }
     }
 
@@ -428,27 +388,39 @@ int KNN()
             //printf("item is %d", item);
             //here we are getting the bitmap from the orginal 1 frequent items array
             queueToGpu[i*countOf2Itemsets + j].item[0] = item;
-            // if(j < 4000 && i < 1){
-            //     printf("item was %d\n", item);
-            //     printf("queue of gpu %d\n", queueToGpu[i*countOf2Itemsets + j].item[0]);
-            // }
-            queueToGpu[i*countOf2Itemsets + j].bitmap = &itemsBitmap[item];
+            if(item == 0){
+                // printf("Copying from itemsBitmap[%d * %d] -> queueToGpu[%d], size = %zu\n",
+                // item, rowSize, (i*countOf2Itemsets + j), rowSize * sizeof(int));
+                // printf(" itemsBitmap capacity = ???, item = %d, rowSize = %d\n", item, rowSize);
+                for(int k = 0; k < rowSize; k++){
+                    if(itemsBitmap[item * rowSize + k] != 0 && k < 25){
+                        //printf("found item: %d near index %d\n", item, k * 32);
+                    }
+                }
+            }
+            
+            memcpy(queueToGpu[i*countOf2Itemsets + j].bitmap,
+            &itemsBitmap[item * rowSize],
+            rowSize * sizeof(int));
+            
         }
     }
-    printf("we just filled the gpu queue");
+    //printf("we just filled the gpu queue\n");
     /* We are now ready to send this to the gpu*/
     ItemBitmap *d_2Itemsets;
     cudaMalloc(&(d_2Itemsets), sizeOfQueueToGpu * sizeof(ItemBitmap));
-    // for(int i = 0; i < sizeOfQueueToGpu; i++){
-    // //     cudaMemcpy(&(d_2Itemsets[i] ->item), ,1 * sizeof(int *), cudaMemcpyHostToDevice);
-    // //     cudaMemcpy(&(d_2Itemsets[i] ->bitmap), rowSize * sizeof(int *), cudaMemcpyHostToDevice);
-    // //     // cudaMalloc(&d_2Itemsets[i].item, sizeof(int));
-    //     //cudaMalloc((void**)&((d_2Itemsets)[i].bitmap), rowSize * sizeof(int));
-    // }
+    printf("item in bitmap to gpu queuetoGPU bitmap %d\n", queueToGpu[0].item[0]);
+    for(int i = 0; i < rowSize; i++){
+        if(queueToGpu[0].bitmap[i]!= 0 && i < 20){
+            //printf("found item %d at around index %d int value was %d\n", queueToGpu[0].item[0], i * 32, queueToGpu[0].bitmap[i]);
+        }
+    }
+
     printf("we just past cudaMalloc\n");
     //cudaMemcpy(d_2Itemsets, queueToGpu, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
     printf("we got past firstmemcpy \n");
     ItemBitmap *h_2Itemsets = (ItemBitmap *)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
+
 
     for (int i = 0; i < 2 * countOf2Itemsets; i++) {
         // Allocate memory for struct members on the GPU
@@ -458,7 +430,7 @@ int KNN()
         // Copy actual bitmap data from host to device
         cudaMemcpy(h_2Itemsets[i].item, queueToGpu[i].item, sizeof(int), cudaMemcpyHostToDevice);
         if(i < 1000){
-            printf("we copied an item %d and i was %d\n", queueToGpu[i].item[0], i);
+            //printf("we copied an item %d and i was %d\n", queueToGpu[i].item[0], i);
         }
         cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
     }
@@ -486,7 +458,7 @@ int KNN()
 
     cudaEventRecord(startEvent);
     // processItemSets<<<blocksPerGrid, threadsPerBlock>>>(d_text, minItemCount, d_offsets, lineCountInDataset, blocksPerGrid);
-    processItemsetOnGPU<<<blocksPerGrid, threadsPerBlock>>>(d_2Itemsets);
+    processItemsetOnGPU<<<blocksPerGrid, threadsPerBlock>>>(d_2Itemsets, countOf2Itemsets, rowSize);
     cudaDeviceSynchronize();
     cudaEventRecord(stopEvent);
     cudaEventSynchronize(stopEvent);
