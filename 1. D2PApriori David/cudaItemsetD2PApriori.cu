@@ -27,32 +27,53 @@ typedef struct
 
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
+
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int sectionOfBitmap = tid % rowSize;
     //since our Vert database is so long, it will span multiple blocks 
     bool isInFirstBlock = true;
+    //printf("rowsize is %d", rowSize);
+    int verticalListIndex = tid / rowSize;
+
+    int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
+    int item1 = items[verticalListIndex].item[0];
+    int item2 = items[verticalListIndex2].item[0];
+    if(tid / rowSize == 209375){
+        //printf("209372 FOUND FIRST VERTICAL LIST INDEX IS %d\n", verticalListIndex);
+    }
+    if(tid / rowSize == 209377 && tid % rowSize == 0){
+        printf("209377 first item should not be zero it's instead: %d\n", item1);
+    }
     if(sectionOfBitmap > blockDim.x){
         isInFirstBlock = false;
     }
     
-    if(tid < 3125){
-        int verticalListIndex = tid / rowSize;
-        int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
-        int item1 = items[verticalListIndex].item[0];
-        int item2 = items[verticalListIndex2].item[0];
-        if(tid % rowSize <= 2){ 
-            printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, items[tid / rowSize].item[0], items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
-            //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
+    /* Here I am assigning a tid to handle a section of the vertical bitmap */
+    // if(tid < rowSize){
+    // launched 690575000 threads was that right?
+        if(tid % rowSize == 0 && tid/rowSize < countOf2Itemsets){ 
+            
+           printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
+           
+           //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
         }
 
-        int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
-        int resultIndex = sectionOfBitmap * 32;
-        if(result != 0){
-            printf("items 0 and 1 are at are around %d result was %d\n", resultIndex, result);
-        }
+        // int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
+        // int resultIndex = sectionOfBitmap * 32;
+        // if(result != 0){
+        //     printf("items 0 and 1 are at are around %d result was %d\n", resultIndex, result);
+        // }
         
-    }   
+    // }   
+
+    
     __syncthreads();
+
+    // if(tid % rowSize == 0 && tid < countOf2Itemsets){
+    //     printf("I am tid %d and my items are %d and %d \n", tid, item1, item2);
+        
+    // }
+    // __syncthreads();
     // if(tid < countOf2Itemsets){
     // int item = items[tid].item[0];
     //     if (item == 999)
@@ -234,15 +255,6 @@ int KNN()
             // }
             // printf("\n");
         }
-
-        // printf("not segfaulted\n");
-        
-        // firstBitmap[countInBitmap].id =  number;
-        // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
-        // printf("Are we gonna segfault OUT OF INNER? + locaiton of insertion %d\n", locationOfInsertion);
-        //countInBitmap++;
-        // printf("%d\n", number);
-        //countOfItems++;
     }
 
     int firstItemCount = 0;
@@ -429,7 +441,7 @@ int KNN()
 
         // Copy actual bitmap data from host to device
         cudaMemcpy(h_2Itemsets[i].item, queueToGpu[i].item, sizeof(int), cudaMemcpyHostToDevice);
-        if(i < 1000){
+        if(i < countOf2Itemsets && queueToGpu[i].item[0] == 0){
             //printf("we copied an item %d and i was %d\n", queueToGpu[i].item[0], i);
         }
         cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
