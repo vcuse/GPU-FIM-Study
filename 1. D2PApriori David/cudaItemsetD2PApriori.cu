@@ -27,7 +27,10 @@ typedef struct
 
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
+    extern __shared__ int indexSheet[1024];
 
+    //hardcoded p value (cus we have 1000 items)
+    int pValue = 4;
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     int sectionOfBitmap = tid % rowSize;
     //since our Vert database is so long, it will span multiple blocks 
@@ -46,17 +49,20 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
     }
     if(sectionOfBitmap > blockDim.x){
         isInFirstBlock = false;
-    }
+    }  
     
     /* Here I am assigning a tid to handle a section of the vertical bitmap */
     // if(tid < rowSize){
     // launched 690575000 threads was that right?
-        if(tid % rowSize == 0 && tid/rowSize < countOf2Itemsets){ 
-            
-           printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
-           
-           //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
-        }
+    int encodedPair = 0;
+    if(tid % rowSize == 0 && tid/rowSize < countOf2Itemsets){ 
+        
+        //printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
+        encodedPair += item1;
+        encodedPair += item2 * 10000;
+        //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
+        printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
+    }   
 
         // int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
         // int resultIndex = sectionOfBitmap * 32;
@@ -66,7 +72,12 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
         
     // }   
 
-    
+    /* We need to generate a p value
+    Let's say we have itemset {123, 546, 7}
+    We can use a P = 3 to show it as 123546007
+
+
+    */
     __syncthreads();
 
     // if(tid % rowSize == 0 && tid < countOf2Itemsets){
