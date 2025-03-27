@@ -54,12 +54,12 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
     /* Here I am assigning a tid to handle a section of the vertical bitmap */
     // if(tid < rowSize){
     // launched 690575000 threads was that right?
-    int encodedPair = 0;
+    long encodedPair = 0;
     if(tid % rowSize == 0 && tid/rowSize < countOf2Itemsets){ 
         
         //printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
         encodedPair += item1;
-        encodedPair += item2 * 10000;
+        encodedPair += item2 * 10000LL;
         //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
         printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
     }   
