@@ -27,15 +27,19 @@ typedef struct
 
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
-    extern __shared__ int indexSheet[1024];
+    extern __shared__ int side1[2];
+    //extern __shared__ int side2[1];
 
     //hardcoded p value (cus we have 1000 items)
     int pValue = 4;
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    
     int sectionOfBitmap = tid % rowSize;
     //since our Vert database is so long, it will span multiple blocks 
     bool isInFirstBlock = true;
     //printf("rowsize is %d", rowSize);
+
+    //this is aka itemset number
     int verticalListIndex = tid / rowSize;
 
     int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
@@ -55,14 +59,30 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
     // if(tid < rowSize){
     // launched 690575000 threads was that right?
     long encodedPair = 0;
-    if(tid % rowSize == 0 && tid/rowSize < countOf2Itemsets){ 
+    if(tid % rowSize == 0 || tid % 1024 == 0 && tid/rowSize < countOf2Itemsets){ 
         
         //printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
         encodedPair += item1;
         encodedPair += item2 * 10000LL;
         //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
         printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
+        side1[0] = item1;
+        side2[0] = encodedPair;
     }   
+    __syncthreads();
+
+    for(int i = 0; i < 1; i++){
+        for(int j = 0; j < 1; j++){
+            if(side1[i] / pValue == side2[j] / pValue && i < j){
+                matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated 
+            }
+        }
+    }
+
+    
+
+    //Now the pair (k-1) is inside the block and we can work on creating k item candidates
+
 
         // int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
         // int resultIndex = sectionOfBitmap * 32;
@@ -78,7 +98,6 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
 
 
     */
-    __syncthreads();
 
     // if(tid % rowSize == 0 && tid < countOf2Itemsets){
     //     printf("I am tid %d and my items are %d and %d \n", tid, item1, item2);
