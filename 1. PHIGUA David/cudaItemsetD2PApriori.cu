@@ -29,7 +29,7 @@ typedef struct
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
     extern __shared__ int side1[2];
     //extern __shared__ int side2[1];
-
+    
     //hardcoded p value (cus we have 1000 items)
     int pValue = 4;
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -80,57 +80,6 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
     }
 
     
-
-    //Now the pair (k-1) is inside the block and we can work on creating k item candidates
-
-
-        // int result = items[verticalListIndex].bitmap[sectionOfBitmap] & items[verticalListIndex2].bitmap[sectionOfBitmap];
-        // int resultIndex = sectionOfBitmap * 32;
-        // if(result != 0){
-        //     printf("items 0 and 1 are at are around %d result was %d\n", resultIndex, result);
-        // }
-        
-    // }   
-
-    /* We need to generate a p value
-    Let's say we have itemset {123, 546, 7}
-    We can use a P = 3 to show it as 123546007
-
-
-    */
-
-    // if(tid % rowSize == 0 && tid < countOf2Itemsets){
-    //     printf("I am tid %d and my items are %d and %d \n", tid, item1, item2);
-        
-    // }
-    // __syncthreads();
-    // if(tid < countOf2Itemsets){
-    // int item = items[tid].item[0];
-    //     if (item == 999)
-    //     {
-    //         printf("\n Item %d: ", item);
-    //         for (int j = 0; j < 3125; j++)
-    //         {
-
-    //             int temp = items[tid].bitmap[j];
-                
-    //             int position = 100000 - (j * 32);
-    //             int locationtracker = j;
-    //             if (temp != 0)
-    //             {
-    //                 //int temp = itemsBitmap[ j] & -itemsBitmap[ j];
-    //                 int index =  __ffs(temp);  // Get index of LSB (0-based)
-    //                 //printf("Bit at index: %d\n", index);
-    //                 printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ",temp, position + index + 1, locationtracker);
-    //             }
-    //         }
-    //     }
-    // }
-
-    
-     
-
-        //printf("tid %d 2 items in first item is %d \n",tid,  items[tid].item[0]);
     
 }
 
