@@ -3,7 +3,7 @@ With recent advancements in GPU computing, many new Algorithms have been develop
 section on online stores, that is created using a FIM. I recently wanted to benchmark the memory consumption and runtime performance of these multithreaded GPU algorithms. 
 This is the repo for a collection of GPU-Based Frequency Itemset Mining Algorithms. It is the location where the recoded versions of these algorithms will be hosted 
 
-This is a study focused on benchmarking and testing popular Frequent Itemset algorithms. Algorithms were pulled from IEEE Xplore 
+This is a study focused on benchmarking and testing popular Frequent Itemset algorithms. Algorithms were pulled from IEEE Xplore & sciencedirect
 
 # Standardized Testing
 Each algorithm is run on the same exact datasets. For now the datasets we are including are 
