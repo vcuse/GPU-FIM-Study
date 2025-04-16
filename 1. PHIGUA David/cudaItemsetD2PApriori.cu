@@ -67,17 +67,17 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
         //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
         printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
         side1[0] = item1;
-        side2[0] = encodedPair;
+        //side2[0] = encodedPair;
     }   
     __syncthreads();
 
-    for(int i = 0; i < 1; i++){
-        for(int j = 0; j < 1; j++){
-            if(side1[i] / pValue == side2[j] / pValue && i < j){
-                matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated 
-            }
-        }
-    }
+    // for(int i = 0; i < 1; i++){
+    //     for(int j = 0; j < 1; j++){
+    //         if(side1[i] / pValue == side2[j] / pValue && i < j){
+    //             //matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated 
+    //         }
+    //     }
+    // }
 
     
     
