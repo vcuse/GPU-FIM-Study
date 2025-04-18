@@ -213,7 +213,7 @@ TreeNode Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions, 
             }
         }
     }
-    printf("root node count = %d\n", root->count);
+    printf("root node count = %d count of transactions was %d\n", root->count, countOfTransactions);
 }
 
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
