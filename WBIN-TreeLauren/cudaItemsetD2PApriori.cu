@@ -65,7 +65,7 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
         encodedPair += item1;
         encodedPair += item2 * 10000LL;
         //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
-        printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
+        //printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
         side1[0] = item1;
         //side2[0] = encodedPair;
     }   
@@ -108,11 +108,11 @@ int KNN()
     printf("we started\n");
     clock_t cpu_start_withSetup = clock();
     //a 1-d array (flat) that will store all of the 1sized itemsets
-    int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
+    // int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
     clock_t setupTimeStart = clock();
     // int lineCountInDataset = 1692081;
     // int lineCountInDataset = 55012;
-
+    int countOfItems = 1000;
     int lineCountInDataset = 100000;
     const char *inDataFilePath = "../T10I4D100K.txt";
 
@@ -158,19 +158,15 @@ int KNN()
     It is known the total number of possible items is 181682 (i counted this)
     */
 
-    /* for the t100 database let's do that calculation
-    100,000 transactions / 32 bits and we get 3125 numbers requiredto store that
-
-    we want to keep our arrays 1-D (best memory eff) so let's say
-
-    1000 items (known) * 3125 = 325000 total required array length
-
+    /* 
+    calculating the size of the array to store the bitset for this study
+    ((total number of items in dataset + 32) / 32)  * (total number of transactions))
+    (1000 + 32) / 32 * 100,000 = 3,200,000 ints needed
+    rowSize = 32
     */
 
-    // keeping track of our location of where we are in the bitmap
-    // we know we need 1718 ints because we have 55012 transactions, so we do 55012 / 32 bits and get 1717.12 but we need 1718 to cover the remainder
-
-    int rowSize = 3125; // already known
+    int *itemsBitmap = (int *)calloc(3200000, sizeof(int));
+    int rowSize = 32; // already known
     int countInBitmap = 0;
     // ItemBitmap firstBitmap[181682];
 
@@ -179,7 +175,7 @@ int KNN()
     // }
 
     //int* itemBitmap2 = generateBitmapCPU(h_buffer, h_offsets);
-    int countOfItems = 0;
+    //int countOfItems = 0;
     // int items[55012];
     // printf("before for loop\n");
     for (int i = 0; i < 100000; i++)
@@ -203,12 +199,17 @@ int KNN()
                 inNumber = true;
             }
             else if (inNumber)
-            {
-                int locationOfInsertion = locationOfTransaction + (number * rowSize);
+            {   
+
+                //let's say our number = 0, we will want it to be at i = 999 - number (aka 0)
+                //from section IV A2 in the paper
+                int locationOfInsertion =  (countOfItems - 1 - number) / 32;
+                int bitLocationOfFlip = number % 32;
+                int intLocationToAdjust = (rowSize * i) + locationOfInsertion;
                 if(number == 0){
                     int locationOfLine = i + 1;
-                    //printf("We found item 0 at line %d", locationOfLine);
-                    //printf("the location of insertion will be %d\b\n", locationOfInsertion);
+                    printf("We found item 0 at line %d", locationOfLine);
+                    printf(" the location of insertion will be %d\b\n", intLocationToAdjust);
                 }
 
                 // printf("Are we gonna segfault? + locaiton of insertion %d and number is %d\n", locationOfInsertion, number);
@@ -217,7 +218,7 @@ int KNN()
                 // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
                 countInBitmap++;
                 // printf("%d\n",number);
-                countOfItems++;
+                //countOfItems++;
                 // items[itemCount] = number;
                 itemCount++;
                 number = 0;
@@ -238,12 +239,12 @@ int KNN()
 
     int firstItemCount = 0;
     for(int i = 0; i < rowSize; i++){
-        if(itemsBitmap[999 * rowSize + i]!= 0){
-            firstItemCount += __builtin_popcount(itemsBitmap[999 * rowSize + i]);
+        if(itemsBitmap[0 * rowSize + i]!= 0){
+            firstItemCount += __builtin_popcount(itemsBitmap[0 * rowSize + i]);
         }
     }
 
-    printf("total number of 999s is %d\n", firstItemCount);
+    printf("total number of 0 is %d\n", firstItemCount);
     printf("we escaped the for loop");
     int *itemAndCounts = (int *)calloc(1000, sizeof(int));
     for (int i = 0; i < 1000; i++)
