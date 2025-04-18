@@ -23,66 +23,65 @@ typedef struct
     int firstChild;
 } Node;
 
-
-
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
-__global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize){
+__global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize)
+{
     extern __shared__ int side1[2];
-    //extern __shared__ int side2[1];
-    
-    //hardcoded p value (cus we have 1000 items)
+    // extern __shared__ int side2[1];
+
+    // hardcoded p value (cus we have 1000 items)
     int pValue = 4;
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    int sectionOfBitmap = tid % rowSize;
-    //since our Vert database is so long, it will span multiple blocks 
-    bool isInFirstBlock = true;
-    //printf("rowsize is %d", rowSize);
 
-    //this is aka itemset number
+    int sectionOfBitmap = tid % rowSize;
+    // since our Vert database is so long, it will span multiple blocks
+    bool isInFirstBlock = true;
+    // printf("rowsize is %d", rowSize);
+
+    // this is aka itemset number
     int verticalListIndex = tid / rowSize;
 
     int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
     int item1 = items[verticalListIndex].item[0];
     int item2 = items[verticalListIndex2].item[0];
-    if(tid / rowSize == 209375){
-        //printf("209372 FOUND FIRST VERTICAL LIST INDEX IS %d\n", verticalListIndex);
+    if (tid / rowSize == 209375)
+    {
+        // printf("209372 FOUND FIRST VERTICAL LIST INDEX IS %d\n", verticalListIndex);
     }
-    if(tid / rowSize == 209377 && tid % rowSize == 0){
+    if (tid / rowSize == 209377 && tid % rowSize == 0)
+    {
         printf("209377 first item should not be zero it's instead: %d\n", item1);
     }
-    if(sectionOfBitmap > blockDim.x){
+    if (sectionOfBitmap > blockDim.x)
+    {
         isInFirstBlock = false;
-    }  
-    
+    }
+
     /* Here I am assigning a tid to handle a section of the vertical bitmap */
     // if(tid < rowSize){
     // launched 690575000 threads was that right?
     long encodedPair = 0;
-    if(tid % rowSize == 0 || tid % 1024 == 0 && tid/rowSize < countOf2Itemsets){ 
-        
-        //printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
+    if (tid % rowSize == 0 || tid % 1024 == 0 && tid / rowSize < countOf2Itemsets)
+    {
+
+        // printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
         encodedPair += item1;
         encodedPair += item2 * 10000LL;
-        //printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
-        //printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
+        // printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
+        // printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
         side1[0] = item1;
-        //side2[0] = encodedPair;
-    }   
+        // side2[0] = encodedPair;
+    }
     __syncthreads();
 
     // for(int i = 0; i < 1; i++){
     //     for(int j = 0; j < 1; j++){
     //         if(side1[i] / pValue == side2[j] / pValue && i < j){
-    //             //matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated 
+    //             //matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated
     //         }
     //     }
     // }
-
-    
-    
 }
-
 
 /*
 removeLowFrequencyItems is used to remove the items in the bitmap that have low frequency
@@ -93,120 +92,151 @@ int *removeLowFrequencyItemsCPU(int *inBitMap, int rowLength, int minItemCount)
 {
 }
 
-int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount){
+int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount)
+{
     int k = 0;
 
-    if(sizeof(inBitmap) == 0){
-        
+    if (sizeof(inBitmap) == 0)
+    {
     }
 }
 
-TreeNode* createNode(int* bitSet, int transactionNumber, int rowSize){
+TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
+{
     int indexStart = transactionNumber * rowSize;
-    //printf("We are right abotu to make a new node\n");
-    TreeNode* newNode = (TreeNode*) malloc(sizeof(TreeNode));
-    newNode->weight = (int *)malloc(32 * sizeof(int));
-    if (newNode == NULL) {
+    // printf("We are right abotu to make a new node\n");
+    TreeNode *newNode = (TreeNode *)malloc(sizeof(TreeNode));
+    newNode->weight = (int *)malloc(rowSize * sizeof(int));
+    if (newNode == NULL)
+    {
         fprintf(stderr, "Memory allocation failed!\n");
         exit(1);
     }
-    
-    //copying the bitmap section for this node specifically
-    for (int i = 0; i < rowSize; i++) {
+
+    // copying the bitmap section for this node specifically
+    for (int i = 0; i < rowSize; i++)
+    {
         newNode->weight[i] = bitSet[indexStart + i];
     }
-   
+
     newNode->count = 1;
     newNode->Child = NULL;
     newNode->Next = NULL;
-    //printf("we tried\n");
+    // printf("we tried\n");
     return newNode;
-
 }
 
-TreeNode Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions, int rowSize){
-    TreeNode* root = createNode(0, 0, 0);
+TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions, int rowSize)
+{
+    printf("[BUILD TREE STARTED]\n");
+    TreeNode *root = createNode(0, 0, 0);
     int complete = 0;
-    TreeNode* traverseNode = NULL;
+    TreeNode *traverseNode = NULL;
     printf("%d\n", weightBitSet[64]);
-    for(int i = 0; i < countOfTransactions; i++){
+    for (int i = 0; i < countOfTransactions; i++)
+    {
         int transaction = i;
-        //printf("have we crashed yet?\n ");
+        // printf("have we crashed yet?\n ");
         int indexStart = rowSize * i;
-        if(root->Child == NULL){
-            //printf("nope\n ");
-            TreeNode* newNode = createNode(weightBitSet, i, rowSize);
-            //root = newNode;
+        if (root->Child == NULL)
+        {
+            // printf("nope\n ");
+            TreeNode *newNode = createNode(weightBitSet, i, rowSize);
+            // root = newNode;
             root->Child = newNode;
-           //traverseNode = root;
+            // traverseNode = root;
         }
-        else{
-            //printf("we entered else \n");
+        else
+        {
+            // printf("we entered else \n");
             complete = 0;
-            
+
             traverseNode = root->Child;
-            while(complete != 1){
+            while (complete != 1)
+            {
                 bool doesMatch = true;
-                for(int j = 0; j < rowSize; j++){
-                    //printf("checking at lcation %d on item %d\n", transaction * rowSize + j, transaction);
-                    if(traverseNode != NULL && weightBitSet[transaction * rowSize + j] != traverseNode->weight[j]){
-                         //printf("crashing here?\n");
-                         doesMatch = false;
-                         break;
+                for (int j = 0; j < rowSize; j++)
+                {
+                    // printf("checking at lcation %d on item %d\n", transaction * rowSize + j, transaction);
+                    if (traverseNode != NULL && weightBitSet[transaction * rowSize + j] != traverseNode->weight[j])
+                    {
+                        // printf("crashing here?\n");
+                        doesMatch = false;
+                        //break;
                     }
                 }
-                if(doesMatch){
+                if (doesMatch)
+                {
                     complete = 1;
                     traverseNode->count = traverseNode->count + 1;
                 }
-                else{
-                    //printf("crashing here?\n");
-                    bool isIncluded = true; //represents the ^ on line 12 in Algorithm 1
-                    for(int j = 0; j < rowSize; j++){
-                       // printf("crashing here?\n");
-                        if(weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != traverseNode->weight[j]){
+                else
+                {
+                    // printf("crashing here?\n");
+                    bool isIncluded = true; // represents the ^ on line 12 in Algorithm 1
+                    for (int j = 0; j < rowSize; j++)
+                    {
+                        // printf("crashing here?\n");
+                        if (weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != traverseNode->weight[j])
+                        {
                             isIncluded = false;
-                            //break;
+                            // break;
                         }
                     }
-                    if(isIncluded){
-                        //printf("crashing 172?\n");
-                        if(traverseNode != NULL && traverseNode->Child == NULL){
+                    if (isIncluded)
+                    {
+                        // printf("crashing 172?\n");
+                        if (traverseNode != NULL && traverseNode->Child == NULL)
+                        {
                             
-                            TreeNode* newNode = createNode(weightBitSet, transaction, rowSize);
+                            TreeNode *newNode = createNode(weightBitSet, transaction, rowSize);
                             traverseNode->Child = newNode;
                             complete = 1;
                         }
-                        else{
-                            //printf("are we gonna crash?\n");
-                            if(traverseNode != NULL){
-                               //printf("are we gonna crash?\n");
-                                traverseNode = traverseNode->Child; // Move to the child
+                        else
+                        {
+                            // printf("are we gonna crash?\n");
+                            if (traverseNode != NULL)
+                            {
+                                // printf("are we gonna crash?\n");
+                                //traverseNode->Child = traverseNode; 
+                                traverseNode = traverseNode->Child;// Move to the child
                             }
                         }
                     }
-                    else{
+                    else
+                    {
                         bool isEqualWeightk = true;
-                        //printf("crashing here?\n");
-                        for(int j = 0; j < rowSize; j++){
-                            //printf("crashing here?\n");
-                            if(weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != weightBitSet[transaction * rowSize + j]){
+                        // printf("crashing here?\n");
+                        for (int j = 0; j < rowSize; j++)
+                        {
+                            // printf("crashing here?\n");
+                            if (weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != weightBitSet[transaction * rowSize + j])
+                            {
                                 isEqualWeightk = false;
-                                //break;
+                                // break;
                             }
                         }
-                        if(isEqualWeightk){
-                            //printf("crashing here?\n");
-                            TreeNode* newNode = createNode(weightBitSet, transaction, rowSize);
-                            traverseNode = newNode;
-                            newNode->Child = traverseNode;
-                            //traverseNode = newNode;
-                            //traverseNode->Child = newNode;
-                            complete = 1;
+                        if (isEqualWeightk)
+                        {
+                            if(traverseNode->Next == NULL){
+                                // printf("crashing here?\n");
+                                TreeNode *newNode = createNode(weightBitSet, transaction, rowSize);
+                                newNode->Child = traverseNode;
+                                newNode->Next = traverseNode->Next;
+                                //traverseNode = newNode;
+                                
+                                // traverseNode = newNode;
+                                // traverseNode->Child = newNode;
+                                complete = 1;
+                            }
                         }
-                        else{
-                            //printf("or here?\n");
-                            traverseNode->Next = traverseNode;
+                        else
+                        {
+                            // printf("or here?\n");
+                            if(traverseNode->Next != NULL){
+                                traverseNode->Next = traverseNode;
+                            }
                         }
                     }
                 }
@@ -214,6 +244,34 @@ TreeNode Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions, 
         }
     }
     printf("root node count = %d count of transactions was %d\n", root->count, countOfTransactions);
+    return root;
+}
+
+void depthFirstTraversal(TreeNode *wBinTree)
+{
+    // return 1;
+    if (wBinTree != NULL)
+    {   
+        if(wBinTree->count > 2){
+            printf("Count: %d\n", wBinTree->count);
+        }
+        if (wBinTree->Child != NULL)
+        {
+            depthFirstTraversal(wBinTree->Child);
+        }
+
+        TreeNode *sibling = wBinTree->Next;
+        while (sibling)
+        {
+            depthFirstTraversal(sibling);
+            sibling = sibling->Next;
+        }
+    }
+}
+
+void *Weighted_Binary_Count_Tree_Mining(TreeNode *wBinTree, int rowSize)
+{
+    depthFirstTraversal(wBinTree);
 }
 
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
@@ -222,8 +280,8 @@ int KNN()
     int minItemCount = 3; // setting the minimum # of items to be considered an itemset
     printf("we started\n");
     clock_t cpu_start_withSetup = clock();
-    //a 1-d array (flat) that will store all of the 1sized itemsets
-    // int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
+    // a 1-d array (flat) that will store all of the 1sized itemsets
+    //  int *itemsBitmap = (int *)calloc(3125000, sizeof(int));
     clock_t setupTimeStart = clock();
     // int lineCountInDataset = 1692081;
     // int lineCountInDataset = 55012;
@@ -273,7 +331,7 @@ int KNN()
     It is known the total number of possible items is 181682 (i counted this)
     */
 
-    /* 
+    /*
     calculating the size of the array to store the bitset for this study
     ((total number of items in dataset + 32) / 32)  * (total number of transactions))
     (1000 + 32) / 32 * 100,000 = 3,200,000 ints needed
@@ -289,10 +347,10 @@ int KNN()
     //     firstBitmap[i].bitmap = (int*)calloc(1718, sizeof(int));
     // }
 
-    //int* itemBitmap2 = generateBitmapCPU(h_buffer, h_offsets);
-    //int countOfItems = 0;
-    // int items[55012];
-    // printf("before for loop\n");
+    // int* itemBitmap2 = generateBitmapCPU(h_buffer, h_offsets);
+    // int countOfItems = 0;
+    //  int items[55012];
+    //  printf("before for loop\n");
     for (int i = 0; i < 100000; i++)
     {
         // printf("line %d\n", i);
@@ -314,17 +372,18 @@ int KNN()
                 inNumber = true;
             }
             else if (inNumber)
-            {   
+            {
 
-                //let's say our number = 0, we will want it to be at i = 999 - number (aka 0)
-                //from section IV A2 in the paper
-                int locationOfInsertion =  (countOfItems - 1 - number) / 32;
+                // let's say our number = 0, we will want it to be at i = 999 - number (aka 0)
+                // from section IV A2 in the paper
+                int locationOfInsertion = (countOfItems - 1 - number) / 32;
                 int bitLocationOfFlip = number % 32;
                 int intLocationToAdjust = (rowSize * i) + locationOfInsertion;
-                if(number == 0){
+                if (number == 0)
+                {
                     int locationOfLine = i + 1;
-                    printf("We found item 0 at line %d", locationOfLine);
-                    printf(" the location of insertion will be %d\b\n", intLocationToAdjust);
+                    // printf("We found item 0 at line %d", locationOfLine);
+                    // printf(" the location of insertion will be %d\b\n", intLocationToAdjust);
                 }
 
                 // printf("Are we gonna segfault? + locaiton of insertion %d and number is %d\n", locationOfInsertion, number);
@@ -333,7 +392,7 @@ int KNN()
                 // firstBitmap[countInBitmap].bitmap[location] |= (1 << (i % 32));
                 countInBitmap++;
                 // printf("%d\n",number);
-                //countOfItems++;
+                // countOfItems++;
                 // items[itemCount] = number;
                 itemCount++;
                 number = 0;
@@ -352,7 +411,8 @@ int KNN()
         }
     }
 
-    Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
+    TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
+    depthFirstTraversal(testNode);
     // int firstItemCount = 0;
     // for(int i = 0; i < rowSize; i++){
     //     if(itemsBitmap[0 * rowSize + i]!= 0){
@@ -395,7 +455,6 @@ int KNN()
     //     }
     // }
 
-    
     // int countOfFreqItem = 0;
     // for (int i = 0; i < 1000; i++)
     // {
@@ -408,8 +467,6 @@ int KNN()
 
     // printf("total number of frequent items is %d\n", countOfFreqItem);
     // int* items = (int *)calloc(countOfFreqItem * 3125, sizeof(int));
-    
-    
 
     // int indexInArray = 0;
     // ItemBitmap* cpuFreqBitmap = (ItemBitmap*)calloc(countOfFreqItem, sizeof(ItemBitmap));
@@ -421,17 +478,16 @@ int KNN()
     // for (int i = 0; i < 1000; i++)
     // {
     //     if (itemAndCounts[i] >= minItemCount)
-    //     {   
+    //     {
     //         memcpy(cpuFreqBitmap[indexInArray].item, &i, sizeof(int));
     //         //cpuFreqBitmap[indexInArray] -> item = i;
-            
+
     //         memcpy(cpuFreqBitmap[indexInArray].bitmap, &itemsBitmap[i * rowSize], rowSize * sizeof(int));
     //         indexInArray++;
-            
+
     //         //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
     //     }
     // }
-
 
     // //generating 2 itemsets
     // //calculating worst case max size needed for n=2 itemsets
@@ -445,10 +501,9 @@ int KNN()
     // }
     // int countIndexInPairs = 0;
 
-    
     // /*generating the 2 length itemsets (I'm generating all of them)*/
     // for(int i = 0; i < indexInArray; i++){
-         
+
     //     for(int j = i + 1; j < indexInArray; j++){
     //         cpu2Itemsets[countIndexInPairs].item[0] = cpuFreqBitmap[i].item[0];
     //         cpu2Itemsets[countIndexInPairs].item[1] = cpuFreqBitmap[j].item[0];
@@ -456,7 +511,7 @@ int KNN()
     //             cpu2Itemsets[countIndexInPairs].bitmap[k] = cpuFreqBitmap[i].bitmap[k] & cpuFreqBitmap[j].bitmap[k];
     //         }
     //         countIndexInPairs++;
-            
+
     //     }
 
     // }
@@ -474,7 +529,7 @@ int KNN()
     //     }
     //     if(countOfBits >= minItemCount){
     //         countOf2Itemsets++;
-            
+
     //     }
     // }
 
@@ -486,7 +541,6 @@ int KNN()
     //     queueToGpu[i].bitmap = (int *)malloc(rowSize * sizeof(int));
     // }
 
-    
     // printf("past malloc gpu queue\n");
     // /*This is very inefficient (the array isn't flat), will need to be improved*/
     // for(int i = 0; i < 2; i++){
@@ -506,11 +560,11 @@ int KNN()
     //                 }
     //             }
     //         }
-            
+
     //         memcpy(queueToGpu[i*countOf2Itemsets + j].bitmap,
     //         &itemsBitmap[item * rowSize],
     //         rowSize * sizeof(int));
-            
+
     //     }
     // }
     // //printf("we just filled the gpu queue\n");
@@ -529,10 +583,9 @@ int KNN()
     // printf("we got past firstmemcpy \n");
     // ItemBitmap *h_2Itemsets = (ItemBitmap *)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
 
-
     // for (int i = 0; i < 2 * countOf2Itemsets; i++) {
     //     // Allocate memory for struct members on the GPU
-    //     cudaMalloc(&(h_2Itemsets[i].item), sizeof(int)); 
+    //     cudaMalloc(&(h_2Itemsets[i].item), sizeof(int));
     //     cudaMalloc(&(h_2Itemsets[i].bitmap), rowSize * sizeof(int));
 
     //     // Copy actual bitmap data from host to device
@@ -542,7 +595,7 @@ int KNN()
     //     }
     //     cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
     // }
-    
+
     // cudaMemcpy(d_2Itemsets, h_2Itemsets, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
 
     // /* setting up our grid to determine how many threads we will need */
@@ -552,8 +605,6 @@ int KNN()
     // printf("number of threads is roughly %d\n", threadsPerBlock * blocksPerGrid);
     // int countBitTest = 6;
     // printf("result of buildin_popcount = %d\n", __builtin_popcount(countBitTest));
-
-   
 
     // // here I would want to generate all itemsets
 
@@ -595,7 +646,7 @@ int KNN()
     // }
 
     // Record end time
-    clock_t cpu_end_withSetup = clock();
+    // clock_t cpu_end_withSetup = clock();
     // Calculate elapsed time in milliseconds
     // float cpuElapsedTime = ((float)(cpu_end - cpu_start)) / CLOCKS_PER_SEC * 1000.0;
     // float cpuElapsedTimeSetup = ((float)(cpu_end_withSetup - cpu_start_withSetup)) / CLOCKS_PER_SEC * 1000.0;
@@ -621,5 +672,6 @@ int main(int argc, char *argv[])
 
     printf("test\n");
     int x = KNN();
+    printf("finished\n");
     return -1;
 }
