@@ -23,6 +23,18 @@ typedef struct
     int firstChild;
 } Node;
 
+typedef struct{
+    TreeNode* table[1000];
+} HashTable;
+
+unsigned int hash(int vals, int tableSize){
+    int hash = 0;
+    hash = 31 * hash + vals;
+    return hash % tableSize;
+}
+
+
+
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize)
 {
@@ -93,6 +105,16 @@ int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount)
     {
     }
 }
+
+int hashItemsetPointer(int* itemset, int rowSize){
+    int seed = 0;
+    for(int i = 0; i < rowSize; i++){
+        seed ^= itemset[i] + (seed << 6) + (seed >> 2);
+    }
+    printf("seed for hash is %d\n", seed);
+    return seed;
+}
+
 
 TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
 {
@@ -240,23 +262,44 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
     return root;
 }
 
-void depthFirstTraversal(TreeNode *wBinTree)
+int countSetBits(int* bitSet, int rowSize){
+    int k = 0;
+    for(int i = 0; i < rowSize; i++){
+        if(bitSet[i] > 0){
+            k += __popc(bitSet[i]);
+        }
+    }   
+    return k;
+}
+
+__global__ int* generate_Subset(int* nodeElements, int rowSize, int countElements)
+{
+    int tid = blockDim.x * blockIdx + threadIdx.x;
+    for(int i = 0; i < countElements; i++){
+        if()
+    }
+}
+
+void depthFirstTraversal(TreeNode *wBinTree, int rowSize)
 {
     // return 1;
     if (wBinTree != NULL)
     {   
+        
         if(wBinTree->count > 2){
             printf("Count: %d\n", wBinTree->count);
+            hashItemsetPointer(wBinTree->weight, rowSize);
+            int countOfItems = countSetBits(wBinTree->weight, rowSize);
         }
         if (wBinTree->Child != NULL)
         {
-            depthFirstTraversal(wBinTree->Child);
+            depthFirstTraversal(wBinTree->Child, rowSize);
         }
 
         TreeNode *sibling = wBinTree->Next;
         while (sibling)
         {
-            depthFirstTraversal(sibling);
+            depthFirstTraversal(sibling, rowSize);
             sibling = sibling->Next;
         }
     }
@@ -264,7 +307,7 @@ void depthFirstTraversal(TreeNode *wBinTree)
 
 void *Weighted_Binary_Count_Tree_Mining(TreeNode *wBinTree, int rowSize)
 {
-    depthFirstTraversal(wBinTree);
+    depthFirstTraversal(wBinTree, rowSize);
 }
 
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
@@ -405,7 +448,7 @@ int KNN()
     }
 
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
-    depthFirstTraversal(testNode);
+    depthFirstTraversal(testNode, rowSize);
     // int firstItemCount = 0;
     // for(int i = 0; i < rowSize; i++){
     //     if(itemsBitmap[0 * rowSize + i]!= 0){
