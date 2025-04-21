@@ -34,6 +34,10 @@ unsigned int hash(int vals, int tableSize){
 }
 
 
+__global__ void generateSubset(int countOf2Itemsets, int rowSize)
+{
+ 
+}
 
 /* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
 __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize)
@@ -266,19 +270,13 @@ int countSetBits(int* bitSet, int rowSize){
     int k = 0;
     for(int i = 0; i < rowSize; i++){
         if(bitSet[i] > 0){
-            k += __popc(bitSet[i]);
+            k += __builtin_popcount(bitSet[i]);
         }
     }   
     return k;
 }
 
-__global__ int* generate_Subset(int* nodeElements, int rowSize, int countElements)
-{
-    int tid = blockDim.x * blockIdx + threadIdx.x;
-    for(int i = 0; i < countElements; i++){
-        if()
-    }
-}
+
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize)
 {
