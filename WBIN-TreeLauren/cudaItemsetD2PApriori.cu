@@ -74,13 +74,6 @@ __global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int
     }
     __syncthreads();
 
-    // for(int i = 0; i < 1; i++){
-    //     for(int j = 0; j < 1; j++){
-    //         if(side1[i] / pValue == side2[j] / pValue && i < j){
-    //             //matrix[i * verticalListIndex  + j] = 0; //marking a candidate was generated
-    //         }
-    //     }
-    // }
 }
 
 /*
@@ -148,7 +141,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
         }
         else
         {
-            // printf("we entered else \n");
+            
             complete = 0;
 
             traverseNode = root->Child;
