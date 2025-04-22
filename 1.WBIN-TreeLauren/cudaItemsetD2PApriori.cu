@@ -269,28 +269,51 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
     return root;
 }
 
-int countSetBits(int* bitSet, int rowSize){
+int* countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
+    int count = 0;
     int k = 0;
+    int* listOfItems = (int *)calloc(512, sizeof(int));
     for(int i = 0; i < rowSize; i++){
-        if(bitSet[i] > 0){
+        if(bitSet[i] != 0){
             k += __builtin_popcount(bitSet[i]);
+            for(int j = 0; j < bitsPerInteger; j++) {
+                
+                //Check if the j-th bit is set in the current integer
+                if ((bitSet[i] >> (32-j)) & 1) {
+                    // Calculate the overall position
+                    int overall_position = 1024 - (i * bitsPerInteger);
+                    int locationOfItem = overall_position -  j;
+                    // --- Do something with the position ---
+                    printf("Bit set starting at position: %d num is %d and j is %d item is at %d location is %d\n", overall_position, bitSet[i], j, locationOfItem);
+                    
+                    
+                    listOfItems[count] = overall_position;
+                    count++;
+                }
+            }
         }
-    }   
-    return k;
+    }
+       
+    return listOfItems;
 }
 
 
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize)
 {
+    // int absent;
+    // khint_t k;
+    // map32_t *h = map32_init();
+    // k = map32_put(h, 20, &absent);
+    
     // return 1;
     if (wBinTree != NULL)
     {   
         
-        if(wBinTree->count > 2){
+        if(wBinTree->count == 30){
             printf("Count: %d\n", wBinTree->count);
-            hashItemsetPointer(wBinTree->weight, rowSize);
-            int countOfItems = countSetBits(wBinTree->weight, rowSize);
+            //hashItemsetPointer(wBinTree->weight, rowSize);
+            int* countOfItems = countSetBits(wBinTree->weight, rowSize, 32);
         }
         if (wBinTree->Child != NULL)
         {
@@ -413,7 +436,7 @@ int KNN()
 
                 // let's say our number = 0, we will want it to be at i = 999 - number (aka 0)
                 // from section IV A2 in the paper
-                int locationOfInsertion = (countOfItems - 1 - number) / 32;
+                int locationOfInsertion = (1024 - number) / 32;
                 int bitLocationOfFlip = number % 32;
                 int intLocationToAdjust = (rowSize * i) + locationOfInsertion;
                 if (number == 0)
@@ -449,10 +472,8 @@ int KNN()
     }
 
     
-    int absent;
-    khint_t k;
-    map32_t *h = map32_init();
-    k = map32_put(h, 20, &absent);
+
+
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
     depthFirstTraversal(testNode, rowSize);
     // int firstItemCount = 0;
