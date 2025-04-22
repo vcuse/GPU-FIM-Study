@@ -37,81 +37,22 @@ unsigned int hash(int vals, int tableSize){
 }
 
 
-__global__ void generateSubset(int countOf2Itemsets, int rowSize)
+__global__ void generateSubset(int countOf2Itemsets, int rowSize, int numElements, int* listOfItems, int* d_listOfNewItems, int skipSize)
 {
- 
-}
 
-/* so essentially, each index is paired with it's assocaited index + countOf2Itemsets */
-__global__ void processItemsetOnGPU(ItemBitmap *items, int countOf2Itemsets, int rowSize)
-{
-    extern __shared__ int side1[2];
-    // extern __shared__ int side2[1];
-
-    // hardcoded p value (cus we have 1000 items)
-    int pValue = 4;
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    int sectionOfBitmap = tid % rowSize;
-    // since our Vert database is so long, it will span multiple blocks
-    bool isInFirstBlock = true;
-    // printf("rowsize is %d", rowSize);
-
-    // this is aka itemset number
-    int verticalListIndex = tid / rowSize;
-
-    int verticalListIndex2 = tid / rowSize + countOf2Itemsets;
-    int item1 = items[verticalListIndex].item[0];
-    int item2 = items[verticalListIndex2].item[0];
-    if (tid / rowSize == 209375)
-    {
-        // printf("209372 FOUND FIRST VERTICAL LIST INDEX IS %d\n", verticalListIndex);
+    int count = 0;
+    if(tid < numElements){
+        for(int j = 0; j < numElements; j++){
+            if(tid & 1 << j){
+                d_listOfNewItems[tid + count] = listOfItems[j];
+            }
+        }
     }
-    if (tid / rowSize == 209377 && tid % rowSize == 0)
-    {
-        printf("209377 first item should not be zero it's instead: %d\n", item1);
-    }
-    if (sectionOfBitmap > blockDim.x)
-    {
-        isInFirstBlock = false;
-    }
-
-    /* Here I am assigning a tid to handle a section of the vertical bitmap */
-    // if(tid < rowSize){
-    // launched 690575000 threads was that right?
-    long encodedPair = 0;
-    if (tid % rowSize == 0 || tid % 1024 == 0 && tid / rowSize < countOf2Itemsets)
-    {
-
-        // printf("I am tid %d and my items are %d and %d my first vertic list index is %d and vl 2 is %d\n", tid, item1, items[countOf2Itemsets + tid / rowSize].item[0], verticalListIndex, verticalListIndex2);
-        encodedPair += item1;
-        encodedPair += item2 * 10000LL;
-        // printf("I am tid %d and my items are %d \n", tid, items[countOf2Itemsets + tid / rowSize].item[0]);
-        // printf("I am tid %d and my encoded item is %d\n", tid, encodedPair);
-        side1[0] = item1;
-        // side2[0] = encodedPair;
-    }
-    __syncthreads();
-
+    
 }
 
-/*
-removeLowFrequencyItems is used to remove the items in the bitmap that have low frequency
-it will return a new bitmap database containing only items which were determined to have support
-greater than the minimum threshold
-*/
-int *removeLowFrequencyItemsCPU(int *inBitMap, int rowLength, int minItemCount)
-{
-}
 
-int *generateCandidates(ItemBitmap *inBitmap, int rowLength, int minItemCount)
-{
-    int k = 0;
-
-    if (sizeof(inBitmap) == 0)
-    {
-    }
-}
 
 int hashItemsetPointer(int* itemset, int rowSize){
     int seed = 0;
@@ -269,6 +210,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
     return root;
 }
 
+
 int* countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     int count = 0;
     int k = 0;
@@ -293,7 +235,23 @@ int* countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
             }
         }
     }
-       
+    int totalSubsets = (int)pow(2, count);
+    int threadsPerBlock = 512;
+    int blocksPerGrid = (totalSubsets + threadsPerBlock) / threadsPerBlock;
+    int* d_GeneratedItemsets;
+    int* d_itemsets;
+    int skipSize = 128;
+    int* h_GeneratedItemsets = (int*)malloc(skipSize * totalSubsets * sizeof(int));
+    cudaMalloc(&(d_GeneratedItemsets), skipSize * totalSubsets * sizeof(int));
+    cudaMalloc(&(d_itemsets), count * sizeof(int));
+    cudaMemcpy(d_itemsets, listOfItems, count * sizeof(int), cudaMemcpyHostToDevice);
+    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(120, rowSize, count, d_itemsets, d_GeneratedItemsets, skipSize);
+    cudaDeviceSynchronize();
+    cudaMemcpy(h_GeneratedItemsets, d_GeneratedItemsets, skipSize * totalSubsets * sizeof(int), cudaMemcpyDeviceToHost);
+    for(int i = 0; i < skipSize * totalSubsets; i++){
+        printf("subset value is %d\n", h_GeneratedItemsets[i]);
+    }
+
     return listOfItems;
 }
 
@@ -301,10 +259,7 @@ int* countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize)
 {
-    // int absent;
-    // khint_t k;
-    // map32_t *h = map32_init();
-    // k = map32_put(h, 20, &absent);
+   
     
     // return 1;
     if (wBinTree != NULL)
@@ -472,7 +427,10 @@ int KNN()
     }
 
     
-
+    int absent;
+    khint_t k;
+    map32_t *h = map32_init();
+    k = map32_put(h, 20, &absent);
 
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
     depthFirstTraversal(testNode, rowSize);
