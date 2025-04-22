@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 #include "../include/commonmethods.h"
+#include "../include/khashl/khashl.h"
 
 #define MAX_NODES 6000 // Maximum nodes in the FP-Tree
 #define EMPTY -1
@@ -26,6 +27,8 @@ typedef struct
 typedef struct{
     TreeNode* table[1000];
 } HashTable;
+
+KHASHL_MAP_INIT(KH_LOCAL, map32_t, map32, uint32_t, int, kh_hash_uint32, kh_eq_generic)
 
 unsigned int hash(int vals, int tableSize){
     int hash = 0;
@@ -445,6 +448,11 @@ int KNN()
         }
     }
 
+    
+    int absent;
+    khint_t k;
+    map32_t *h = map32_init();
+    k = map32_put(h, 20, &absent);
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
     depthFirstTraversal(testNode, rowSize);
     // int firstItemCount = 0;
