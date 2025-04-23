@@ -36,7 +36,7 @@ unsigned int hash(int vals, int tableSize){
     return hash % tableSize;
 }
 
-__global__ void generateSubset(int maxThreads, int* Test)
+__global__ void generateSubset(int maxThreads, int* Test, int* d_generatedSets)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
     int index = 0;
@@ -242,8 +242,9 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     int blocksPerGrid = (totalSubsets + threadsPerBlock - 1) / threadsPerBlock;
     
     int* d_itemsets;
+    int* d_generatedSets;
     int skipSize = 10;
-    //int* h_GeneratedItemsets = (int*)calloc(totalSubsets, sizeof(int));
+    int* h_generatedItemsets = (int*)malloc(totalSubsets);
     
     //cudaMalloc(&d_GeneratedItemsets, generatedMalloc);
    
@@ -252,10 +253,15 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err));
         // Handle error...
     }
+    cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
+    if (malloc_err2 != cudaSuccess) {
+        printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err2));
+        // Handle error...
+    }
 
     cudaMemcpy(d_itemsets, listOfItems, generatedMalloc, cudaMemcpyHostToDevice);
     
-    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets);
+    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets, d_generatedSets);
     printf("===========\n");
     cudaError_t launch_err = cudaGetLastError();
     if (launch_err != cudaSuccess) {
@@ -263,10 +269,10 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         // Handle error...
     }
     cudaDeviceSynchronize();
-    //cudaMemcpy(h_GeneratedItemsets, d_GeneratedItemsets, totalSubsets * sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
     
     cudaFree(d_itemsets);
-    
+    cudaFree(d_generatedSets);
     // cudaFree(d_GeneratedItemsets);
     free(listOfItems);
     //free(h_GeneratedItemsets);
