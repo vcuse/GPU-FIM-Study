@@ -36,23 +36,18 @@ unsigned int hash(int vals, int tableSize){
     return hash % tableSize;
 }
 
-
-__global__ void generateSubset(int countOf2Itemsets, int rowSize, int numElements, int* listOfItems, int* d_listOfNewItems, int skipSize)
+__global__ void generateSubset(int maxThreads, int* Test)
 {
-
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    int count = 0;
-    if(tid < numElements){
-        for(int j = 0; j < numElements; j++){
-            if(tid & 1 << j){
-                d_listOfNewItems[tid + count] = listOfItems[j];
-            }
-        }
+    int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    int index = 0;
+    if(tid < maxThreads){
+        printf("value is %d\n", Test[tid]);
+        //printf("less than maxthreads\n");
+        
     }
+    __syncthreads();
     
 }
-
-
 
 int hashItemsetPointer(int* itemset, int rowSize){
     int seed = 0;
@@ -62,7 +57,6 @@ int hashItemsetPointer(int* itemset, int rowSize){
     printf("seed for hash is %d\n", seed);
     return seed;
 }
-
 
 TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
 {
@@ -211,82 +205,121 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
 }
 
 
-int* countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
+void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     int count = 0;
     int k = 0;
-    int* listOfItems = (int *)calloc(512, sizeof(int));
+    size_t generatedMalloc = 512 * sizeof(int);
+    int* listOfItems = (int *)malloc(generatedMalloc);
+    for(int i = 0; i < 512; i++){
+        listOfItems[i] = 0;
+    }
     for(int i = 0; i < rowSize; i++){
         if(bitSet[i] != 0){
             k += __builtin_popcount(bitSet[i]);
             for(int j = 0; j < bitsPerInteger; j++) {
                 
                 //Check if the j-th bit is set in the current integer
-                if ((bitSet[i] >> (32-j)) & 1) {
+                if ((bitSet[i] >> (bitsPerInteger -j)) & 1) {
+                    //printf("test\n");
                     // Calculate the overall position
                     int overall_position = 1024 - (i * bitsPerInteger);
                     int locationOfItem = overall_position -  j;
                     // --- Do something with the position ---
-                    printf("Bit set starting at position: %d num is %d and j is %d item is at %d location is %d\n", overall_position, bitSet[i], j, locationOfItem);
+                    //printf("Bit set starting at position: %d num is %d and j is %d item is at %d\n", overall_position, bitSet[i], j, locationOfItem);
                     
                     
-                    listOfItems[count] = overall_position;
-                    count++;
+                    listOfItems[count] = locationOfItem;
+                    count = count + 1;
+                    //printf("count for list is %d\n", count);
                 }
             }
         }
     }
-    int totalSubsets = (int)pow(2, count);
-    int threadsPerBlock = 512;
-    int blocksPerGrid = (totalSubsets + threadsPerBlock) / threadsPerBlock;
-    int* d_GeneratedItemsets;
+
+   
+    int totalSubsets = (int)pow(2.0, count);
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (totalSubsets + threadsPerBlock - 1) / threadsPerBlock;
+    
     int* d_itemsets;
-    int skipSize = 128;
-    int* h_GeneratedItemsets = (int*)malloc(skipSize * totalSubsets * sizeof(int));
-    cudaMalloc(&(d_GeneratedItemsets), skipSize * totalSubsets * sizeof(int));
-    cudaMalloc(&(d_itemsets), count * sizeof(int));
-    cudaMemcpy(d_itemsets, listOfItems, count * sizeof(int), cudaMemcpyHostToDevice);
-    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(120, rowSize, count, d_itemsets, d_GeneratedItemsets, skipSize);
-    cudaDeviceSynchronize();
-    cudaMemcpy(h_GeneratedItemsets, d_GeneratedItemsets, skipSize * totalSubsets * sizeof(int), cudaMemcpyDeviceToHost);
-    for(int i = 0; i < skipSize * totalSubsets; i++){
-        printf("subset value is %d\n", h_GeneratedItemsets[i]);
+    int skipSize = 10;
+    //int* h_GeneratedItemsets = (int*)calloc(totalSubsets, sizeof(int));
+    
+    //cudaMalloc(&d_GeneratedItemsets, generatedMalloc);
+   
+    cudaError_t malloc_err =  cudaMalloc(&d_itemsets, generatedMalloc);
+    if (malloc_err != cudaSuccess) {
+        printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err));
+        // Handle error...
     }
 
-    return listOfItems;
+    cudaMemcpy(d_itemsets, listOfItems, generatedMalloc, cudaMemcpyHostToDevice);
+    
+    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets);
+    printf("===========\n");
+    cudaError_t launch_err = cudaGetLastError();
+    if (launch_err != cudaSuccess) {
+        fprintf(stderr, "Kernel launch failed: %s\n", cudaGetErrorString(launch_err));
+        // Handle error...
+    }
+    cudaDeviceSynchronize();
+    //cudaMemcpy(h_GeneratedItemsets, d_GeneratedItemsets, totalSubsets * sizeof(int), cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_itemsets);
+    
+    // cudaFree(d_GeneratedItemsets);
+    free(listOfItems);
+    //free(h_GeneratedItemsets);
+    printf("exited countSetBits\n");
 }
 
 
 
-void depthFirstTraversal(TreeNode *wBinTree, int rowSize)
+void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter)
 {
    
     
     // return 1;
     if (wBinTree != NULL)
     {   
-        
-        if(wBinTree->count == 30){
-            printf("Count: %d\n", wBinTree->count);
+        //printf("recursive counter is %d\n", recursiveCounter);
+        recursiveCounter++;
+        // if(wBinTree->count == 30){
+            
+        //     printf("Count: %d and counttracker = %d\n", wBinTree->count, counter, recursiveCounter);
+        //     printf("are we gonna segfault\n");
             //hashItemsetPointer(wBinTree->weight, rowSize);
-            int* countOfItems = countSetBits(wBinTree->weight, rowSize, 32);
-        }
+           
+                
+            countSetBits(wBinTree->weight, rowSize, 32);
+            
+            //printf("what about now\n");
+            counter++;
+        // }
         if (wBinTree->Child != NULL)
         {
-            depthFirstTraversal(wBinTree->Child, rowSize);
+            depthFirstTraversal(wBinTree->Child, rowSize, counter, recursiveCounter);
         }
 
-        TreeNode *sibling = wBinTree->Next;
-        while (sibling)
+        TreeNode *sibling = NULL;
+        if(wBinTree->Next != NULL){
+            sibling = wBinTree->Next;
+        }
+        while (sibling != NULL)
         {
-            depthFirstTraversal(sibling, rowSize);
+            depthFirstTraversal(sibling, rowSize, counter, recursiveCounter);
             sibling = sibling->Next;
         }
+    }
+    else{
+        return;
     }
 }
 
 void *Weighted_Binary_Count_Tree_Mining(TreeNode *wBinTree, int rowSize)
 {
-    depthFirstTraversal(wBinTree, rowSize);
+    int count = 0;
+    //depthFirstTraversal(wBinTree, rowSize, count);
 }
 
 // Implements a threaded kNN where for each candidate query an in-place priority queue is maintained to identify the nearest neighbors
@@ -427,13 +460,15 @@ int KNN()
     }
 
     
-    int absent;
-    khint_t k;
-    map32_t *h = map32_init();
-    k = map32_put(h, 20, &absent);
+    // int absent;
+    // khint_t k;
+    // map32_t *h = map32_init();
+    // k = map32_put(h, 20, &absent);
 
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
-    depthFirstTraversal(testNode, rowSize);
+    depthFirstTraversal(testNode, rowSize, 0, 0);
+
+    printf("you are at the end of the KNN\n");
     // int firstItemCount = 0;
     // for(int i = 0; i < rowSize; i++){
     //     if(itemsBitmap[0 * rowSize + i]!= 0){
