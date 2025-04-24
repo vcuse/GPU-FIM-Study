@@ -36,12 +36,31 @@ unsigned int hash(int vals, int tableSize){
     return hash % tableSize;
 }
 
-__global__ void generateSubset(int maxThreads, int* Test, int* d_generatedSets)
+__global__ void generateSubset(int itemsN, int* Test, int* d_generatedSets, int totalSubsets)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
+    int indexStart = tid * itemsN;
+    for(int i = 0; i < itemsN; i++){
+        d_generatedSets[indexStart + i] = 0;
+    }
     int index = 0;
-    if(tid < maxThreads){
-        printf("value is %d\n", Test[tid]);
+    if(tid < totalSubsets){
+        for(int j = 0; j < itemsN; j++){
+            if(tid & 1 << j){
+                bool isAlreadyIn = false;
+                for(int k = 0; k < itemsN; k++){
+                    if(d_generatedSets[indexStart + k] == Test[j]){
+                        isAlreadyIn = true;
+                    }
+                }
+
+                if(!isAlreadyIn){
+                    d_generatedSets[indexStart + index] = Test[j];
+                    index++;
+                }
+            }
+        }
+        //printf("value is %d\n", Test[tid]);
         //printf("less than maxthreads\n");
         
     }
@@ -225,7 +244,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
                     int overall_position = 1024 - (i * bitsPerInteger);
                     int locationOfItem = overall_position -  j;
                     // --- Do something with the position ---
-                    //printf("Bit set starting at position: %d num is %d and j is %d item is at %d\n", overall_position, bitSet[i], j, locationOfItem);
+                    printf("Bit set starting at position: %d num is %d and j is %d item is at %d\n", overall_position, bitSet[i], j, locationOfItem);
                     
                     
                     listOfItems[count] = locationOfItem;
@@ -237,13 +256,14 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     }
 
    
-    int totalSubsets = (int)pow(2.0, count);
-    int threadsPerBlock = 256;
+    size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
+    int totalSubsetsPredict = ((int)pow(2.0, count));
+    int threadsPerBlock = 128;
     int blocksPerGrid = (totalSubsets + threadsPerBlock - 1) / threadsPerBlock;
     
     int* d_itemsets;
     int* d_generatedSets;
-    int skipSize = 10;
+    int skipSize = count; //we do this to save on memory
     int* h_generatedItemsets = (int*)malloc(totalSubsets);
     
     //cudaMalloc(&d_GeneratedItemsets, generatedMalloc);
@@ -253,15 +273,16 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err));
         // Handle error...
     }
+    printf("count = %d ||| total subsets = %zu\n", count, totalSubsets);
     cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
     if (malloc_err2 != cudaSuccess) {
-        printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err2));
+        printf("Failed to allocate d_generatedSets: %s\n", cudaGetErrorString(malloc_err2));
         // Handle error...
     }
 
     cudaMemcpy(d_itemsets, listOfItems, generatedMalloc, cudaMemcpyHostToDevice);
     
-    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets, d_generatedSets);
+    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets, d_generatedSets, totalSubsetsPredict);
     printf("===========\n");
     cudaError_t launch_err = cudaGetLastError();
     if (launch_err != cudaSuccess) {
@@ -271,11 +292,19 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     cudaDeviceSynchronize();
     cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
     
+    for(int i = 0; i < totalSubsetsPredict * count; i++){
+        if(i % count == 0){
+            printf("------ subset -------\n");
+        }
+
+        printf("%d\n", h_generatedItemsets[i]);
+    }
     cudaFree(d_itemsets);
     cudaFree(d_generatedSets);
     // cudaFree(d_GeneratedItemsets);
     free(listOfItems);
-    //free(h_GeneratedItemsets);
+    free(h_generatedItemsets);
+
     printf("exited countSetBits\n");
 }
 
@@ -288,20 +317,21 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
     // return 1;
     if (wBinTree != NULL)
     {   
-        //printf("recursive counter is %d\n", recursiveCounter);
-        recursiveCounter++;
-        // if(wBinTree->count == 30){
+        //printf("recursive counter is %d and tree count is %d\n", recursiveCounter, wBinTree->count);
+        
+        if(wBinTree->count > 2){
             
-        //     printf("Count: %d and counttracker = %d\n", wBinTree->count, counter, recursiveCounter);
-        //     printf("are we gonna segfault\n");
-            //hashItemsetPointer(wBinTree->weight, rowSize);
+        // //     printf("Count: %d and counttracker = %d\n", wBinTree->count, counter, recursiveCounter);
+        // //     printf("are we gonna segfault\n");
+        //     //hashItemsetPointer(wBinTree->weight, rowSize);
            
-                
+        
             countSetBits(wBinTree->weight, rowSize, 32);
             
-            //printf("what about now\n");
-            counter++;
-        // }
+        //     //printf("what about now\n");
+        //     counter++;
+        }
+        recursiveCounter++;
         if (wBinTree->Child != NULL)
         {
             depthFirstTraversal(wBinTree->Child, rowSize, counter, recursiveCounter);
