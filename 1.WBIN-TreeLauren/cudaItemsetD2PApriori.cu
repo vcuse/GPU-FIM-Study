@@ -259,7 +259,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
     int totalSubsetsPredict = ((int)pow(2.0, count));
     int threadsPerBlock = 128;
-    int blocksPerGrid = (totalSubsets + threadsPerBlock - 1) / threadsPerBlock;
+    int blocksPerGrid = (totalSubsetsPredict + threadsPerBlock - 1) / threadsPerBlock;
     
     int* d_itemsets;
     int* d_generatedSets;
