@@ -44,25 +44,28 @@ __global__ void generateSubset(int itemsN, int* Test, int* d_generatedSets, int 
         d_generatedSets[indexStart + i] = 0;
     }
     int index = 0;
-    if(tid < totalSubsets){
-        for(int j = 0; j < itemsN; j++){
-            if(tid & 1 << j){
-                bool isAlreadyIn = false;
-                for(int k = 0; k < itemsN; k++){
-                    if(d_generatedSets[indexStart + k] == Test[j]){
-                        isAlreadyIn = true;
-                    }
-                }
+    // if(tid < totalSubsets){
+    //     for(int j = 0; j < itemsN; j++){
+    //         if(tid & 1 << j){
+    //             bool isAlreadyIn = false;
+    //             for(int k = 0; k < itemsN; k++){
+    //                 if(d_generatedSets[indexStart + k] == Test[j]){
+    //                     isAlreadyIn = true;
+    //                 }
+    //             }
 
-                if(!isAlreadyIn){
-                    d_generatedSets[indexStart + index] = Test[j];
-                    index++;
-                }
-            }
-        }
-        //printf("value is %d\n", Test[tid]);
-        //printf("less than maxthreads\n");
+    //             if(!isAlreadyIn){
+    //                 d_generatedSets[indexStart + index] = Test[j];
+    //                 index++;
+    //             }
+    //         }
+    //     }
+    //     //printf("value is %d\n", Test[tid]);
+    //     //printf("less than maxthreads\n");
         
+    // }
+    if(tid< itemsN){
+        printf("value is %d\n", Test[tid]);
     }
     __syncthreads();
     
@@ -79,7 +82,14 @@ int hashItemsetPointer(int* itemset, int rowSize){
 
 TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
 {
-    int indexStart = transactionNumber * rowSize;
+    int indexStart;
+    if(transactionNumber != -1){
+         indexStart = transactionNumber * rowSize;
+    }
+    else{
+        indexStart = 0;
+    }
+   
     // printf("We are right abotu to make a new node\n");
     TreeNode *newNode = (TreeNode *)malloc(sizeof(TreeNode));
     newNode->weight = (int *)malloc(rowSize * sizeof(int));
@@ -94,8 +104,13 @@ TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
     {
         newNode->weight[i] = bitSet[indexStart + i];
     }
-
-    newNode->count = 1;
+    if(transactionNumber == -1){
+        newNode->count = -1;
+    }
+    else{
+        newNode->count = 1;
+    }
+    
     newNode->Child = NULL;
     newNode->Next = NULL;
     // printf("we tried\n");
@@ -103,9 +118,10 @@ TreeNode *createNode(int *bitSet, int transactionNumber, int rowSize)
 }
 
 TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions, int rowSize)
-{
+{   
+    int *rootBitset = (int *)calloc(rowSize, sizeof(int));
     printf("[BUILD TREE STARTED]\n");
-    TreeNode *root = createNode(0, 0, 0);
+    TreeNode *root = createNode(rootBitset, -1, rowSize);
     int complete = 0;
     TreeNode *traverseNode = NULL;
     printf("%d\n", weightBitSet[64]);
@@ -244,66 +260,69 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
                     int overall_position = 1024 - (i * bitsPerInteger);
                     int locationOfItem = overall_position -  j;
                     // --- Do something with the position ---
-                    printf("Bit set starting at position: %d num is %d and j is %d item is at %d\n", overall_position, bitSet[i], j, locationOfItem);
+                    //printf("Bit set starting at position: %d num is %d and j is %d item is at %d\n", overall_position, bitSet[i], j, locationOfItem);
                     
                     
                     listOfItems[count] = locationOfItem;
                     count = count + 1;
-                    //printf("count for list is %d\n", count);
+                    printf("count for list is %d\n", count);
                 }
             }
         }
     }
 
-   
-    size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
-    int totalSubsetsPredict = ((int)pow(2.0, count));
-    int threadsPerBlock = 128;
-    int blocksPerGrid = (totalSubsetsPredict + threadsPerBlock - 1) / threadsPerBlock;
+    if(count < 25){
+        size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
+        int totalSubsetsPredict = ((int)pow(2.0, count));
+        int threadsPerBlock = 128;
+        int blocksPerGrid = (totalSubsetsPredict + threadsPerBlock - 1) / threadsPerBlock;
+        
+        int* d_itemsets;
+        int* d_generatedSets;
+        int skipSize = count; //we do this to save on memory
+        int* h_generatedItemsets = (int*)malloc(totalSubsets);
+        
+        //cudaMalloc(&d_GeneratedItemsets, generatedMalloc);
     
-    int* d_itemsets;
-    int* d_generatedSets;
-    int skipSize = count; //we do this to save on memory
-    int* h_generatedItemsets = (int*)malloc(totalSubsets);
-    
-    //cudaMalloc(&d_GeneratedItemsets, generatedMalloc);
-   
-    cudaError_t malloc_err =  cudaMalloc(&d_itemsets, generatedMalloc);
-    if (malloc_err != cudaSuccess) {
-        printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err));
-        // Handle error...
-    }
-    printf("count = %d ||| total subsets = %zu\n", count, totalSubsets);
-    cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
-    if (malloc_err2 != cudaSuccess) {
-        printf("Failed to allocate d_generatedSets: %s\n", cudaGetErrorString(malloc_err2));
-        // Handle error...
-    }
-
-    cudaMemcpy(d_itemsets, listOfItems, generatedMalloc, cudaMemcpyHostToDevice);
-    
-    generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets, d_generatedSets, totalSubsetsPredict);
-    printf("===========\n");
-    cudaError_t launch_err = cudaGetLastError();
-    if (launch_err != cudaSuccess) {
-        fprintf(stderr, "Kernel launch failed: %s\n", cudaGetErrorString(launch_err));
-        // Handle error...
-    }
-    cudaDeviceSynchronize();
-    cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
-    
-    for(int i = 0; i < totalSubsetsPredict * count; i++){
-        if(i % count == 0){
-            printf("------ subset -------\n");
+        cudaError_t malloc_err =  cudaMalloc(&d_itemsets, generatedMalloc);
+        if (malloc_err != cudaSuccess) {
+            printf("Failed to allocate d_itemsets: %s\n", cudaGetErrorString(malloc_err));
+            // Handle error...
+            exit(1);
+        }
+        printf("count = %d ||| total subsets = %zu\n", count, totalSubsets);
+        cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
+        if (malloc_err2 != cudaSuccess) {
+            printf("Failed to allocate d_generatedSets: %s\n", cudaGetErrorString(malloc_err2));
+            // Handle error...
         }
 
-        printf("%d\n", h_generatedItemsets[i]);
+        cudaMemcpy(d_itemsets, listOfItems, generatedMalloc, cudaMemcpyHostToDevice);
+        
+        generateSubset<<<blocksPerGrid, threadsPerBlock>>>(count, d_itemsets, d_generatedSets, totalSubsetsPredict);
+        //printf("===========\n");
+        cudaError_t launch_err = cudaGetLastError();
+        if (launch_err != cudaSuccess) {
+            fprintf(stderr, "Kernel launch failed: %s\n", cudaGetErrorString(launch_err));
+            // Handle error...
+        }
+        cudaDeviceSynchronize();
+        cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
+        
+        for(int i = 0; i < totalSubsetsPredict * count; i++){
+            if(i % count == 0){
+                //printf("------ subset -------\n");
+            }
+
+            //printf("%d\n", h_generatedItemsets[i]);
+        }
+        cudaFree(d_itemsets);
+        cudaFree(d_generatedSets);
+        // cudaFree(d_GeneratedItemsets);
+        free(h_generatedItemsets);
     }
-    cudaFree(d_itemsets);
-    cudaFree(d_generatedSets);
-    // cudaFree(d_GeneratedItemsets);
     free(listOfItems);
-    free(h_generatedItemsets);
+    
 
     printf("exited countSetBits\n");
 }
@@ -319,9 +338,9 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
     {   
         //printf("recursive counter is %d and tree count is %d\n", recursiveCounter, wBinTree->count);
         
-        if(wBinTree->count > 2){
+        if(wBinTree->count > 0 ){
             
-        // //     printf("Count: %d and counttracker = %d\n", wBinTree->count, counter, recursiveCounter);
+            printf("Count: %d and counttracker = %d\n", wBinTree->count, recursiveCounter);
         // //     printf("are we gonna segfault\n");
         //     //hashItemsetPointer(wBinTree->weight, rowSize);
            
@@ -336,7 +355,7 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
         {
             depthFirstTraversal(wBinTree->Child, rowSize, counter, recursiveCounter);
         }
-
+        
         TreeNode *sibling = NULL;
         if(wBinTree->Next != NULL){
             sibling = wBinTree->Next;
