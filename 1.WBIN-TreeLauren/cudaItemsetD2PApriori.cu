@@ -389,8 +389,8 @@ int KNN()
     // int lineCountInDataset = 1692081;
     // int lineCountInDataset = 55012;
     int countOfItems = 1000;
-    int lineCountInDataset = 100000;
-    const char *inDataFilePath = "../T10I4D100K.txt";
+    int lineCountInDataset = 10000;
+    const char *inDataFilePath = "../T10I4D100KfirstTenth.txt";
 
     FILE *file = fopen(inDataFilePath, "r");
 
@@ -440,8 +440,8 @@ int KNN()
     (1000 + 32) / 32 * 100,000 = 3,200,000 ints needed
     rowSize = 32
     */
-
-    int *itemsBitmap = (int *)calloc(3200000, sizeof(int));
+   int sizeNeeded = (countOfItems + 32) / 32 * lineCountInDataset;
+    int *itemsBitmap = (int *)calloc(sizeNeeded, sizeof(int));
     int rowSize = 32; // already known
     int countInBitmap = 0;
     // ItemBitmap firstBitmap[181682];
@@ -454,7 +454,7 @@ int KNN()
     // int countOfItems = 0;
     //  int items[55012];
     //  printf("before for loop\n");
-    for (int i = 0; i < 100000; i++)
+    for (int i = 0; i < lineCountInDataset; i++)
     {
         // printf("line %d\n", i);
         int locationOfTransaction = i / 32;
@@ -520,7 +520,7 @@ int KNN()
     // map32_t *h = map32_init();
     // k = map32_put(h, 20, &absent);
 
-    TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, 100000, rowSize);
+    TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, lineCountInDataset, rowSize);
     depthFirstTraversal(testNode, rowSize, 0, 0);
 
     printf("you are at the end of the KNN\n");
