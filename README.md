@@ -7,6 +7,7 @@ This is a study focused on benchmarking and testing popular Frequent Itemset alg
 
 # Standardized Testing
 Each algorithm is run on the same exact datasets. For now the datasets we are including are 
+- T10I4D100K (first 10,000 lines) for testing/debugging purposes 
 - T10I4D100K
 
 # How does this study work?
