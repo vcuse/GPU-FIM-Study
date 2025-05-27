@@ -65,7 +65,7 @@ __global__ void generateSubset(int itemsN, int* Test, int* d_generatedSets, int 
         
     // }
     if(tid< itemsN){
-        printf("value is %d\n", Test[tid]);
+        //printf("value is %d\n", Test[tid]);
     }
     __syncthreads();
     
@@ -314,7 +314,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
                 //printf("------ subset -------\n");
             }
 
-            //printf("%d\n", h_generatedItemsets[i]);
+            printf("%d\n", h_generatedItemsets[i]);
         }
         cudaFree(d_itemsets);
         cudaFree(d_generatedSets);
