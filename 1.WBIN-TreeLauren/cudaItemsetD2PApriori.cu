@@ -250,7 +250,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
 }
 
 //setBits is counting how many bits are set for the item 
-void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
+void countSetBits(int* bitSet, int rowSize, int bitsPerInteger, map32_t *h){
     int count = 0;
     int k = 0;
     size_t generatedMalloc = 512 * sizeof(int);
@@ -302,7 +302,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
             // Handle error...
             exit(1);
         }
-        printf("count = %d ||| total subsets = %zu\n", count, ((int)pow(2.0, count)));
+        //printf("count = %d ||| total subsets = %zu\n", count, ((int)pow(2.0, count)));
         cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
         if (malloc_err2 != cudaSuccess) {
             printf("Failed to allocate d_generatedSets: %s\n", cudaGetErrorString(malloc_err2));
@@ -320,32 +320,45 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         }
         cudaDeviceSynchronize();
         cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
-        printf("original set\n");
+        //printf("original set\n");
         for(int i = 0; i < count; i++){
-            printf("%d , ", listOfItems[i]);
+            //printf("%d , ", listOfItems[i]);
         }
-        printf("-------------- \n");
-        
+        //printf("-------------- \n");
+        u_int64_t hashValue = 0;
         int nonZeros = 0;
         int startIndex = -1;
         for(int i = 0; i < totalSubsetsPredict * count; i++){
             if(i % count == 0){
                 nonZeros = 0;
-                printf("------ subset -------\n");
+                //printf("------ subset -------\n");
                 startIndex = i;
             }
             
-            printf("%d\n", h_generatedItemsets[i]);
+            //printf("%d\n", h_generatedItemsets[i]);
             if(h_generatedItemsets[i] != 0){
                 nonZeros++;
             }
             
             if(i % count == count - 1 && i > 0){
-                u_int64_t hashValue = hash_int_list(&h_generatedItemsets[startIndex], nonZeros);
-                printf("Hash value of this subsets is %" PRIu64 " and nonZeros is %d\n", hashValue, nonZeros);
+                hashValue = hash_int_list(&h_generatedItemsets[startIndex], nonZeros);
+                //printf("Hash value of this subsets is %" PRIu64 " and nonZeros is %d\n", hashValue, nonZeros);
+                int absent;
+                khint_t k;
+                k = map32_put(h, hashValue, &absent); // get iterator to the new bucket
+                if (absent) {
+                    // Key 10 was not in the map, so it was just inserted.
+                    // Initialize its value to 0.
+                    kh_val(h, k) = 0;
+                    //printf("Key %" PRIu64 ": Not found, initialized to %d\n", hashValue, kh_val(h, k));
+                } else {
+                    // This part won't be hit for the first insertion of key 10.
+                    // If it were found, we would increment.
+                    kh_val(h, k)++;
+                    //printf("Key %" PRIu64 ": Found, incremented to %d\n", hashValue, kh_val(h, k));
+                }
             }
         }
-        
         
 
         cudaFree(d_itemsets);
@@ -356,11 +369,11 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     free(listOfItems);
     
 
-    printf("exited countSetBits\n");
+    //printf("exited countSetBits\n");
 }
 
 
-void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter)
+void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter, map32_t *h )
 {
     // return 1;
     if (wBinTree != NULL)
@@ -369,13 +382,16 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
         
         if(wBinTree->count > 0 ){
             
-            printf("Count: %d and counttracker = %d\n", wBinTree->count, recursiveCounter); 
-            countSetBits(wBinTree->weight, rowSize, 32);
+      
+            
+            //printf("Count: %d and counttracker = %d\n", wBinTree->count, recursiveCounter); 
+            countSetBits(wBinTree->weight, rowSize, 32, h);
+            
         }
         recursiveCounter++;
         if (wBinTree->Child != NULL)
         {
-            depthFirstTraversal(wBinTree->Child, rowSize, counter, recursiveCounter);
+            depthFirstTraversal(wBinTree->Child, rowSize, counter, recursiveCounter, h);
         }
         
         TreeNode *sibling = NULL;
@@ -384,7 +400,7 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
         }
         while (sibling != NULL)
         {
-            depthFirstTraversal(sibling, rowSize, counter, recursiveCounter);
+            depthFirstTraversal(sibling, rowSize, counter, recursiveCounter, h);
             sibling = sibling->Next;
         }
     }
@@ -541,9 +557,15 @@ int KNN()
     // khint_t k;
     // map32_t *h = map32_init();
     // k = map32_put(h, 20, &absent);
-
+    map32_t *h = map32_init();
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, lineCountInDataset, rowSize);
-    depthFirstTraversal(testNode, rowSize, 0, 0);
+    depthFirstTraversal(testNode, rowSize, 0, 0, h);
+    khint_t k;
+    int absent;
+    // Iterate through the hash map
+    kh_foreach(h, k) { // iterate
+        printf("h[%u]=%d\n", kh_key(h, k), kh_val(h, k));
+    }
 
     printf("you are at the end of the KNN\n");
     
