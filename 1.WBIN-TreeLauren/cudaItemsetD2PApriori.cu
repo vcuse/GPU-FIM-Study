@@ -44,26 +44,26 @@ __global__ void generateSubset(int itemsN, int* Test, int* d_generatedSets, int 
         d_generatedSets[indexStart + i] = 0;
     }
     int index = 0;
-    // if(tid < totalSubsets){
-    //     for(int j = 0; j < itemsN; j++){
-    //         if(tid & 1 << j){
-    //             bool isAlreadyIn = false;
-    //             for(int k = 0; k < itemsN; k++){
-    //                 if(d_generatedSets[indexStart + k] == Test[j]){
-    //                     isAlreadyIn = true;
-    //                 }
-    //             }
+    if(tid < totalSubsets){
+        for(int j = 0; j < itemsN; j++){
+            if(tid & 1 << j){
+                bool isAlreadyIn = false;
+                for(int k = 0; k < itemsN; k++){
+                    if(d_generatedSets[indexStart + k] == Test[j]){
+                        isAlreadyIn = true;
+                    }
+                }
 
-    //             if(!isAlreadyIn){
-    //                 d_generatedSets[indexStart + index] = Test[j];
-    //                 index++;
-    //             }
-    //         }
-    //     }
-    //     //printf("value is %d\n", Test[tid]);
-    //     //printf("less than maxthreads\n");
+                if(!isAlreadyIn){
+                    d_generatedSets[indexStart + index] = Test[j];
+                    index++;
+                }
+            }
+        }
+        //printf("value is %d\n", Test[tid]);
+        //printf("less than maxthreads\n");
         
-    // }
+    }
     if(tid< itemsN){
         //printf("value is %d\n", Test[tid]);
     }
@@ -239,7 +239,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
     return root;
 }
 
-
+//setBits is counting how many bits are set for the item 
 void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
     int count = 0;
     int k = 0;
@@ -265,13 +265,15 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
                     
                     listOfItems[count] = locationOfItem;
                     count = count + 1;
-                    printf("count for list is %d\n", count);
+                    //printf("count for list is %d\n", count);
                 }
             }
         }
     }
 
-    if(count < 25){
+    if(count < 5){
+        //why do i multiply (2.0 ^ count) * count? because I know that the largest subset will be
+        //almost the size of the beginning array (this is so inefficient don't do this)
         size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
         int totalSubsetsPredict = ((int)pow(2.0, count));
         int threadsPerBlock = 128;
@@ -290,7 +292,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
             // Handle error...
             exit(1);
         }
-        printf("count = %d ||| total subsets = %zu\n", count, totalSubsets);
+        printf("count = %d ||| total subsets = %zu\n", count, ((int)pow(2.0, count)));
         cudaError_t malloc_err2 =  cudaMalloc(&d_generatedSets, totalSubsets);
         if (malloc_err2 != cudaSuccess) {
             printf("Failed to allocate d_generatedSets: %s\n", cudaGetErrorString(malloc_err2));
@@ -308,14 +310,25 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         }
         cudaDeviceSynchronize();
         cudaMemcpy(h_generatedItemsets, d_generatedSets, totalSubsets, cudaMemcpyDeviceToHost);
-        
+        printf("original set\n");
+        for(int i = 0; i < count; i++){
+            printf("%d , ", listOfItems[i]);
+        }
+        printf("-------------- \n");
+        printf("------ subset -------\n");
+        int nonZeros = 0;
         for(int i = 0; i < totalSubsetsPredict * count; i++){
-            if(i % count == 0){
-                //printf("------ subset -------\n");
+            
+            printf("%d\n", h_generatedItemsets[i]);
+            if(h_generatedItemsets!= 0){
+                nonZeros++;
             }
 
-            printf("%d\n", h_generatedItemsets[i]);
+
         }
+        
+        
+
         cudaFree(d_itemsets);
         cudaFree(d_generatedSets);
         // cudaFree(d_GeneratedItemsets);
@@ -331,8 +344,6 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter)
 {
-   
-    
     // return 1;
     if (wBinTree != NULL)
     {   
@@ -340,15 +351,8 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
         
         if(wBinTree->count > 0 ){
             
-            printf("Count: %d and counttracker = %d\n", wBinTree->count, recursiveCounter);
-        // //     printf("are we gonna segfault\n");
-        //     //hashItemsetPointer(wBinTree->weight, rowSize);
-           
-        
+            printf("Count: %d and counttracker = %d\n", wBinTree->count, recursiveCounter); 
             countSetBits(wBinTree->weight, rowSize, 32);
-            
-        //     //printf("what about now\n");
-        //     counter++;
         }
         recursiveCounter++;
         if (wBinTree->Child != NULL)
@@ -371,7 +375,7 @@ void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recur
     }
 }
 
-void *Weighted_Binary_Count_Tree_Mining(TreeNode *wBinTree, int rowSize)
+void *Weighted_Binary_Count_Tree_Mining(TreeNode *wBinTree, int rowSize, int minFreq)
 {
     int count = 0;
     //depthFirstTraversal(wBinTree, rowSize, count);
@@ -524,257 +528,7 @@ int KNN()
     depthFirstTraversal(testNode, rowSize, 0, 0);
 
     printf("you are at the end of the KNN\n");
-    // int firstItemCount = 0;
-    // for(int i = 0; i < rowSize; i++){
-    //     if(itemsBitmap[0 * rowSize + i]!= 0){
-    //         firstItemCount += __builtin_popcount(itemsBitmap[0 * rowSize + i]);
-    //     }
-    // }
-
-    // printf("total number of 0 is %d\n", firstItemCount);
-    // printf("we escaped the for loop");
-    // int *itemAndCounts = (int *)calloc(1000, sizeof(int));
-    // for (int i = 0; i < 1000; i++)
-    // {
-    //     int sumOfInts = 0;
-    //     for (int j = 0; j < rowSize; j++)
-    //     {
-    //         sumOfInts += __builtin_popcount(itemsBitmap[i * 3125 + j]);
-    //     }
-    //     itemAndCounts[i] = sumOfInts;
-
-    //     if (i == 0)
-    //     {
-    //         printf("\n Item %d: ", i);
-    //         for (int j = 0; j < rowSize; j++)
-    //         {
-
-    //             int temp = itemsBitmap[i * 3125 + j];
-
-    //             int position = 100000 - (j * 32);
-    //             int locationtracker = i * 3125 + j;
-    //             if (itemsBitmap[i * rowSize + j] != 0)
-    //             {
-    //                 int temp = itemsBitmap[i * rowSize + j] & -itemsBitmap[i * rowSize + j];
-    //                 int index = __builtin_ctz(temp); // Get index of LSB (0-based)
-    //                 //printf("Bit at index: %d\n", index);
-    //                 if(locationtracker < 20){
-    //                     printf("%d, tid %d , the location (which should match insertion where this is should be %d |||| ", itemsBitmap[locationtracker], position + index + 1, locationtracker);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // int countOfFreqItem = 0;
-    // for (int i = 0; i < 1000; i++)
-    // {
-    //     if (itemAndCounts[i] >= minItemCount)
-    //     {
-    //         countOfFreqItem++;
-    //         //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
-    //     }
-    // }
-
-    // printf("total number of frequent items is %d\n", countOfFreqItem);
-    // int* items = (int *)calloc(countOfFreqItem * 3125, sizeof(int));
-
-    // int indexInArray = 0;
-    // ItemBitmap* cpuFreqBitmap = (ItemBitmap*)calloc(countOfFreqItem, sizeof(ItemBitmap));
-    // for(int i = 0; i < countOfFreqItem; i++){
-    //     cpuFreqBitmap[i].bitmap = (int*)malloc(rowSize * sizeof(int));
-    //     cpuFreqBitmap[i].item = (int*)malloc(sizeof(int));
-    // }
-
-    // for (int i = 0; i < 1000; i++)
-    // {
-    //     if (itemAndCounts[i] >= minItemCount)
-    //     {
-    //         memcpy(cpuFreqBitmap[indexInArray].item, &i, sizeof(int));
-    //         //cpuFreqBitmap[indexInArray] -> item = i;
-
-    //         memcpy(cpuFreqBitmap[indexInArray].bitmap, &itemsBitmap[i * rowSize], rowSize * sizeof(int));
-    //         indexInArray++;
-
-    //         //printf("Items %d had a frequency >3 of %d\n", i, itemAndCounts[i]);
-    //     }
-    // }
-
-    // //generating 2 itemsets
-    // //calculating worst case max size needed for n=2 itemsets
-    // int numPairs = indexInArray * (indexInArray -1)/2;
-    // //printf("numpairs is %d\n", numPairs);
-    // ItemBitmap* cpu2Itemsets = (ItemBitmap*)calloc(numPairs, sizeof(ItemBitmap));
-
-    // for(int i = 0; i < numPairs; i++){
-    //     cpu2Itemsets[i].item = (int *)malloc(2 * sizeof(int));
-    //     cpu2Itemsets[i].bitmap = (int *)malloc(1 * rowSize * sizeof(int));
-    // }
-    // int countIndexInPairs = 0;
-
-    // /*generating the 2 length itemsets (I'm generating all of them)*/
-    // for(int i = 0; i < indexInArray; i++){
-
-    //     for(int j = i + 1; j < indexInArray; j++){
-    //         cpu2Itemsets[countIndexInPairs].item[0] = cpuFreqBitmap[i].item[0];
-    //         cpu2Itemsets[countIndexInPairs].item[1] = cpuFreqBitmap[j].item[0];
-    //         for(int k = 0; k < rowSize; k++){
-    //             cpu2Itemsets[countIndexInPairs].bitmap[k] = cpuFreqBitmap[i].bitmap[k] & cpuFreqBitmap[j].bitmap[k];
-    //         }
-    //         countIndexInPairs++;
-
-    //     }
-
-    // }
-
-    // int countOf2Itemsets = 0;
-    // for(int i = 0; i < numPairs; i++){
-    //     int countOfBits = 0;
-    //     //printf("pair is %d and %d\n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
-    //     for(int j = 0; j < rowSize; j++){
-    //         countOfBits += __builtin_popcount(cpu2Itemsets[i].bitmap[j]);
-    //         if(cpu2Itemsets[i].item[0] == 0){
-    //             //printf("count of bits was %d\n", __builtin_popcount(cpu2Itemsets[i].bitmap[j]));
-    //             //printf("2 frequent itemset is %d and %d \n", cpu2Itemsets[i].item[0], cpu2Itemsets[i].item[1]);
-    //         }
-    //     }
-    //     if(countOfBits >= minItemCount){
-    //         countOf2Itemsets++;
-
-    //     }
-    // }
-
-    // printf("Count of frequent 2 itemsets is %d\n", countOf2Itemsets);
-    // int sizeOfQueueToGpu = 2 * countOf2Itemsets;
-    // ItemBitmap* queueToGpu = (ItemBitmap*)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
-    // for(int i = 0; i < sizeOfQueueToGpu; i++){
-    //     queueToGpu[i].item = (int *)malloc(sizeof(int));
-    //     queueToGpu[i].bitmap = (int *)malloc(rowSize * sizeof(int));
-    // }
-
-    // printf("past malloc gpu queue\n");
-    // /*This is very inefficient (the array isn't flat), will need to be improved*/
-    // for(int i = 0; i < 2; i++){
-    //     for(int j = 0; j < countOf2Itemsets; j++){
-    //         //printf("before item");
-    //         int item = cpu2Itemsets[j].item[i];
-    //         //printf("item is %d", item);
-    //         //here we are getting the bitmap from the orginal 1 frequent items array
-    //         queueToGpu[i*countOf2Itemsets + j].item[0] = item;
-    //         if(item == 0){
-    //             // printf("Copying from itemsBitmap[%d * %d] -> queueToGpu[%d], size = %zu\n",
-    //             // item, rowSize, (i*countOf2Itemsets + j), rowSize * sizeof(int));
-    //             // printf(" itemsBitmap capacity = ???, item = %d, rowSize = %d\n", item, rowSize);
-    //             for(int k = 0; k < rowSize; k++){
-    //                 if(itemsBitmap[item * rowSize + k] != 0 && k < 25){
-    //                     //printf("found item: %d near index %d\n", item, k * 32);
-    //                 }
-    //             }
-    //         }
-
-    //         memcpy(queueToGpu[i*countOf2Itemsets + j].bitmap,
-    //         &itemsBitmap[item * rowSize],
-    //         rowSize * sizeof(int));
-
-    //     }
-    // }
-    // //printf("we just filled the gpu queue\n");
-    // /* We are now ready to send this to the gpu*/
-    // ItemBitmap *d_2Itemsets;
-    // cudaMalloc(&(d_2Itemsets), sizeOfQueueToGpu * sizeof(ItemBitmap));
-    // printf("item in bitmap to gpu queuetoGPU bitmap %d\n", queueToGpu[0].item[0]);
-    // for(int i = 0; i < rowSize; i++){
-    //     if(queueToGpu[0].bitmap[i]!= 0 && i < 20){
-    //         //printf("found item %d at around index %d int value was %d\n", queueToGpu[0].item[0], i * 32, queueToGpu[0].bitmap[i]);
-    //     }
-    // }
-
-    // printf("we just past cudaMalloc\n");
-    // //cudaMemcpy(d_2Itemsets, queueToGpu, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
-    // printf("we got past firstmemcpy \n");
-    // ItemBitmap *h_2Itemsets = (ItemBitmap *)malloc(sizeOfQueueToGpu * sizeof(ItemBitmap));
-
-    // for (int i = 0; i < 2 * countOf2Itemsets; i++) {
-    //     // Allocate memory for struct members on the GPU
-    //     cudaMalloc(&(h_2Itemsets[i].item), sizeof(int));
-    //     cudaMalloc(&(h_2Itemsets[i].bitmap), rowSize * sizeof(int));
-
-    //     // Copy actual bitmap data from host to device
-    //     cudaMemcpy(h_2Itemsets[i].item, queueToGpu[i].item, sizeof(int), cudaMemcpyHostToDevice);
-    //     if(i < countOf2Itemsets && queueToGpu[i].item[0] == 0){
-    //         //printf("we copied an item %d and i was %d\n", queueToGpu[i].item[0], i);
-    //     }
-    //     cudaMemcpy(h_2Itemsets[i].bitmap, queueToGpu[i].bitmap, rowSize * sizeof(int), cudaMemcpyHostToDevice);
-    // }
-
-    // cudaMemcpy(d_2Itemsets, h_2Itemsets, sizeOfQueueToGpu * sizeof(ItemBitmap), cudaMemcpyHostToDevice);
-
-    // /* setting up our grid to determine how many threads we will need */
-    // int threadsPerBlock = 1024;
-    // int blocksPerGrid = ((sizeOfQueueToGpu * rowSize + threadsPerBlock) / threadsPerBlock ) / 2; // how do we know how many blocks we need to use?
-    // printf("BlocksPerGrid = %d\n", blocksPerGrid);
-    // printf("number of threads is roughly %d\n", threadsPerBlock * blocksPerGrid);
-    // int countBitTest = 6;
-    // printf("result of buildin_popcount = %d\n", __builtin_popcount(countBitTest));
-
-    // // here I would want to generate all itemsets
-
-    // clock_t setupTimeEnd = clock();
-
-    // cudaEvent_t startEvent, stopEvent;
-    // cudaEventCreate(&startEvent);
-    // cudaEventCreate(&stopEvent);
-    // float cudaElapsedTime;
-
-    // cudaEventRecord(startEvent);
-    // // processItemSets<<<blocksPerGrid, threadsPerBlock>>>(d_text, minItemCount, d_offsets, lineCountInDataset, blocksPerGrid);
-    // processItemsetOnGPU<<<blocksPerGrid, threadsPerBlock>>>(d_2Itemsets, countOf2Itemsets, rowSize);
-    // cudaDeviceSynchronize();
-    // cudaEventRecord(stopEvent);
-    // cudaEventSynchronize(stopEvent);
-
-    // // Print the elapsed time (milliseconds)
-    // cudaEventElapsedTime(&cudaElapsedTime, startEvent, stopEvent);
-    // printf("CUDA Kernel Execution Time: %.3f ms\n", cudaElapsedTime);
-
-    // // ensure there are no kernel errors
-    // cudaError_t cudaError = cudaGetLastError();
-    // if (cudaError != cudaSuccess)
-    // {
-    //     fprintf(stderr, "processItemSets cudaGetLastError() returned %d: %s\n", cudaError, cudaGetErrorString(cudaError));
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // clock_t retrieveGPUResultsStart = clock();
-    // clock_t retrieveGPUResultsEnd = clock();
-
-    // // global reduction will be written to file
-    // FILE *resultsFile = fopen("cudaItemSetMiningResults.txt", "w");
-    // if (resultsFile == NULL)
-    // {
-    //     perror("Error opening results file");
-    //     return 1;
-    // }
-
-    // Record end time
-    // clock_t cpu_end_withSetup = clock();
-    // Calculate elapsed time in milliseconds
-    // float cpuElapsedTime = ((float)(cpu_end - cpu_start)) / CLOCKS_PER_SEC * 1000.0;
-    // float cpuElapsedTimeSetup = ((float)(cpu_end_withSetup - cpu_start_withSetup)) / CLOCKS_PER_SEC * 1000.0;
-    // float setupTime = ((float)(setupTimeEnd - setupTimeStart)) / CLOCKS_PER_SEC * 1000.0;
-    // float gpuRetrievalTime = ((float)(retrieveGPUResultsEnd - retrieveGPUResultsStart)) / CLOCKS_PER_SEC * 1000.0;
-
-    // printf("CPU Execution Time: %.3f ms\n", cpuElapsedTime);
-    // printf("Total Runtime: %.3f ms\n", cudaElapsedTime + cpuElapsedTime);
-    // printf("Total Runtime (with setup/file write): %.3f ms\n", cpuElapsedTimeSetup);
-    // printf("Total Setup Time: %.3f ms\n", setupTime);
-    // printf("Total GPU Results Retrieval Time: %.3f ms\n", gpuRetrievalTime);
-    // printf("Proccessed %d nodes\n", totalNodes);
-    // // Print the aggregated counts (if has no child then follow up to the parent)
-    // printf("{ ");
-    // for (const auto& [itemSet, count] : map) {
-    //     std::cout << itemSet << ": " << count << '\n';
-    // } printf("}");
+    
     return 1;
 }
 
