@@ -9,6 +9,8 @@
 #include <time.h>
 #include "../include/commonmethods.h"
 #include "../include/khashl/khashl.h"
+#include <inttypes.h> // Required for PRIu64
+
 
 #define MAX_NODES 6000 // Maximum nodes in the FP-Tree
 #define EMPTY -1
@@ -279,7 +281,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
         }
     }
 
-    if(count < 5){
+    if(count < 25){
         //why do i multiply (2.0 ^ count) * count? because I know that the largest subset will be
         //almost the size of the beginning array (this is so inefficient don't do this)
         size_t totalSubsets = (((int)pow(2.0, count)) * count) * sizeof(int);
@@ -340,7 +342,7 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
             
             if(i % count == count - 1 && i > 0){
                 u_int64_t hashValue = hash_int_list(&h_generatedItemsets[startIndex], nonZeros);
-                printf("Hash value of this subsets is %d and nonZeros is %d\n", hashValue, nonZeros);
+                printf("Hash value of this subsets is %" PRIu64 " and nonZeros is %d\n", hashValue, nonZeros);
             }
         }
         
