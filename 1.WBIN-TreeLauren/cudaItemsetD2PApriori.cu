@@ -36,6 +36,14 @@ unsigned int hash(int vals, int tableSize){
     return hash % tableSize;
 }
 
+uint64_t hash_int_list(int* list, int listLen){
+    uint64_t hash = 0;
+    for(int i = 0; i < listLen; i++){
+        hash = hash * 31 + list[i];
+    }
+    return hash;
+}
+
 __global__ void generateSubset(int itemsN, int* Test, int* d_generatedSets, int totalSubsets)
 {
     int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -315,16 +323,25 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
             printf("%d , ", listOfItems[i]);
         }
         printf("-------------- \n");
-        printf("------ subset -------\n");
+        
         int nonZeros = 0;
+        int startIndex = -1;
         for(int i = 0; i < totalSubsetsPredict * count; i++){
+            if(i % count == 0){
+                nonZeros = 0;
+                printf("------ subset -------\n");
+                startIndex = i;
+            }
             
             printf("%d\n", h_generatedItemsets[i]);
-            if(h_generatedItemsets!= 0){
+            if(h_generatedItemsets[i] != 0){
                 nonZeros++;
             }
-
-
+            
+            if(i % count == count - 1 && i > 0){
+                u_int64_t hashValue = hash_int_list(&h_generatedItemsets[startIndex], nonZeros);
+                printf("Hash value of this subsets is %d and nonZeros is %d\n", hashValue, nonZeros);
+            }
         }
         
         
@@ -339,7 +356,6 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger){
 
     printf("exited countSetBits\n");
 }
-
 
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter)

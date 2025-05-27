@@ -19,3 +19,4 @@ typedef struct {
 
 int* generateBitmapCPU(char* h_buffer, int* h_offsets);
 
+uint64_t hash_int_list(int* list, int listLen);
