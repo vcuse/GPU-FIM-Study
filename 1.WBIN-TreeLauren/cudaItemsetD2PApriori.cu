@@ -502,7 +502,7 @@ int KNN()
     (1000 + 32) / 32 * 100,000 = 3,200,000 ints needed
     rowSize = 32
     */
-   int sizeNeeded = (countOfItems + 32) / 32 * lineCountInDataset;
+    int sizeNeeded = (countOfItems + 32) / 32 * lineCountInDataset;
     int *itemsBitmap = (int *)calloc(sizeNeeded, sizeof(int));
     int rowSize = 32; // already known
     int countInBitmap = 0;
