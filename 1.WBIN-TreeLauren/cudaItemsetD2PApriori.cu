@@ -164,7 +164,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
                     {
                         // printf("crashing here?\n");
                         doesMatch = false;
-                        //break;
+                        break;
                     }
                 }
                 if (doesMatch)
@@ -179,10 +179,11 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
                     for (int j = 0; j < rowSize; j++)
                     {
                         // printf("crashing here?\n");
+                        //transaction = k
                         if (weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != traverseNode->weight[j])
                         {
                             isIncluded = false;
-                            // break;
+                            break;
                         }
                     }
                     if (isIncluded)
@@ -202,7 +203,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
                             {
                                 // printf("are we gonna crash?\n");
                                 //traverseNode->Child = traverseNode; 
-                                traverseNode = traverseNode->Child;// Move to the child
+                                traverseNode->Child = traverseNode;// Move to the child
                             }
                         }
                     }
@@ -216,7 +217,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
                             if (weightBitSet[transaction * rowSize + j] & traverseNode->weight[j] != weightBitSet[transaction * rowSize + j])
                             {
                                 isEqualWeightk = false;
-                                // break;
+                                break;
                             }
                         }
                         if (isEqualWeightk)
@@ -226,7 +227,7 @@ TreeNode *Weighted_Binary_Count_Tree(int *weightBitSet, int countOfTransactions,
                                 TreeNode *newNode = createNode(weightBitSet, transaction, rowSize);
                                 newNode->Child = traverseNode;
                                 newNode->Next = traverseNode->Next;
-                                //traverseNode = newNode;
+                                traverseNode = newNode;
                                 
                                 // traverseNode = newNode;
                                 // traverseNode->Child = newNode;
@@ -372,6 +373,29 @@ void countSetBits(int* bitSet, int rowSize, int bitsPerInteger, map32_t *h){
     //printf("exited countSetBits\n");
 }
 
+void iterativeTraversalAndMine(TreeNode *root, int rowSize, map32_t *h) {
+    if (!root) return;
+    std::queue<TreeNode*> q;
+    q.push(root);
+
+    while (!q.empty()) {
+        TreeNode *current = q.front();
+        q.pop();
+
+        // Process the current node
+        if (current->count > 0) {
+            countSetBits(current->weight, rowSize, 32, h);
+        }
+
+        // Add children and siblings to the queue
+        if (current->Child) {
+            q.push(current->Child);
+        }
+        if (current->Next) {
+            q.push(current->Next);
+        }
+    }
+}
 
 void depthFirstTraversal(TreeNode *wBinTree, int rowSize, int counter, int recursiveCounter, map32_t *h )
 {
@@ -558,13 +582,16 @@ int KNN()
     // map32_t *h = map32_init();
     // k = map32_put(h, 20, &absent);
     map32_t *h = map32_init();
+    printf("we are about to make the tree");
     TreeNode* testNode = Weighted_Binary_Count_Tree(itemsBitmap, lineCountInDataset, rowSize);
-    depthFirstTraversal(testNode, rowSize, 0, 0, h);
+    //depthFirstTraversal(testNode, rowSize, 0, 0, h);
+    printf("finished creating the tree");
+    iterativeTraversalAndMine(testNode, rowSize, h);
     khint_t k;
     int absent;
     // Iterate through the hash map
     kh_foreach(h, k) { // iterate
-        printf("h[%u]=%d\n", kh_key(h, k), kh_val(h, k));
+        // printf("h[%u]=%d\n", kh_key(h, k), kh_val(h, k));
     }
 
     printf("you are at the end of the KNN\n");
